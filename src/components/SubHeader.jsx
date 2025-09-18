@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { supabase } from '../utils/supabase';
-import { Save, User, Shield, CreditCard, FileText, HelpCircle, LogOut, Table, ArrowDownUp, HandCoins, PieChart, Layers, BookOpen, Cog, Users, FolderKanban, Wallet, Archive, Clock, FolderCog, Globe, Target, Calendar, Plus, FilePlus, Banknote, Maximize, AreaChart, Receipt, Hash, LayoutDashboard } from 'lucide-react';
+import { Save, User, Shield, CreditCard, FileText, HelpCircle, LogOut, Table, ArrowDownUp, HandCoins, PieChart, Layers, BookOpen, Cog, Users, FolderKanban, Wallet, Archive, Clock, FolderCog, Globe, Target, Calendar, Plus, FilePlus, Banknote, Maximize, AreaChart, Receipt, Hash, LayoutDashboard, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from '../utils/i18n';
 import ProjectSwitcher from './ProjectSwitcher';
@@ -103,6 +103,7 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
     { title: 'Mot de passe et sécurité', icon: Shield, path: '/app/securite' },
     { title: 'Mon abonnement', icon: CreditCard, path: '/app/abonnement' },
     { title: 'Factures', icon: FileText, path: '/app/factures' },
+    { title: 'Supprimer mon compte', icon: Trash2, path: '/app/delete-account', isDestructive: true },
     { title: 'Centre d\'aide', icon: HelpCircle, path: '/app/aide' },
   ];
 
@@ -436,16 +437,19 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
                                       <p className="text-xs text-gray-500 truncate">{state.session?.user?.email}</p>
                                   </div>
                                   <div className="p-1">
-                                      {menuItems.map((item, index) => (
-                                          <React.Fragment key={item.title}>
-                                              <button 
-                                                  onClick={() => handleNavigate(item.path)}
-                                                  className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-gray-700 rounded-md hover:bg-gray-100"
-                                              >
-                                                  <item.icon className="w-4 h-4 text-gray-500" />
-                                                  <span>{item.title}</span>
-                                              </button>
-                                          </React.Fragment>
+                                      {menuItems.map((item) => (
+                                          <button 
+                                              key={item.title}
+                                              onClick={() => handleNavigate(item.path)}
+                                              className={`w-full text-left flex items-center gap-3 px-3 py-2 text-sm rounded-md ${
+                                                  item.isDestructive 
+                                                  ? 'text-red-600 hover:bg-red-50' 
+                                                  : 'text-gray-700 hover:bg-gray-100'
+                                              }`}
+                                          >
+                                              <item.icon className="w-4 h-4" />
+                                              <span>{item.title}</span>
+                                          </button>
                                       ))}
                                       <div className="h-px bg-gray-200 my-1 mx-1"></div>
                                       <button 

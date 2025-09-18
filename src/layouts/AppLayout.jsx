@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { useBudget } from '../context/BudgetContext';
 import Header from '../components/Header';
 import SubHeader from '../components/SubHeader';
@@ -18,7 +18,7 @@ import StickyNote from '../components/StickyNote';
 import GuidedTour from '../components/GuidedTour';
 import TransactionActionMenu from '../components/TransactionActionMenu';
 import FocusView from '../components/FocusView';
-import { saveEntry } from '../context/actions';
+import { saveEntry, saveActual, deleteActual, recordPayment, writeOffActual } from '../context/actions';
 
 import { AnimatePresence } from 'framer-motion';
 import { Loader } from 'lucide-react';
@@ -27,6 +27,7 @@ import { formatCurrency } from '../utils/formatting';
 
 const AppLayout = () => {
     const { state, dispatch } = useBudget();
+    const location = useLocation();
 
     const { 
         projects, activeProjectId, activeSettingsDrawer, isBudgetModalOpen, editingEntry, 
@@ -317,7 +318,7 @@ const AppLayout = () => {
             payload: {
                 title: 'Confirmer le Write-off',
                 message: `Êtes-vous sûr de vouloir annuler le montant restant de ${formatCurrency(remainingAmount, state.settings)} ? Cette action est irréversible.`,
-                onConfirm: () => dispatch({ type: 'WRITE_OFF_ACTUAL', payload: transaction.id }),
+                onConfirm: () => writeOffActual(dispatch, transaction.id),
             }
         });
     };
@@ -370,7 +371,7 @@ const AppLayout = () => {
                 <ActualTransactionModal
                     isOpen={isActualTransactionModalOpen}
                     onClose={() => dispatch({ type: 'CLOSE_ACTUAL_TRANSACTION_MODAL' })}
-                    onSave={(data) => dispatch({ type: 'SAVE_ACTUAL', payload: { actualData: data, editingActual } })}
+                    onSave={(data) => saveActual(dispatch, { actualData: data, editingActual, user: state.session.user, tiers: state.tiers })}
                     onDelete={(id) => {
                         dispatch({
                             type: 'OPEN_CONFIRMATION_MODAL',
@@ -378,7 +379,7 @@ const AppLayout = () => {
                                 title: `Supprimer cette transaction ?`,
                                 message: 'Cette action est irréversible.',
                                 onConfirm: () => {
-                                    dispatch({ type: 'DELETE_ACTUAL', payload: id });
+                                    deleteActual(dispatch, id);
                                     dispatch({ type: 'CLOSE_ACTUAL_TRANSACTION_MODAL' });
                                 },
                             }
@@ -393,7 +394,7 @@ const AppLayout = () => {
                 <PaymentModal
                     isOpen={isPaymentModalOpen}
                     onClose={() => dispatch({ type: 'CLOSE_PAYMENT_MODAL' })}
-                    onSave={(paymentData) => dispatch({ type: 'RECORD_PAYMENT', payload: { actualId: payingActual.id, paymentData } })}
+                    onSave={(paymentData) => recordPayment(dispatch, { actualId: payingActual.id, paymentData, allActuals: state.allActuals })}
                     actualToPay={payingActual}
                     type={payingActual?.type}
                 />

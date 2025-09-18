@@ -360,3 +360,143 @@ export const updateUserCashAccount = async (dispatch, { projectId, accountId, ac
         dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };
+
+export const saveActual = async (dispatch, { actualData, editingActual, user, tiers }) => {
+  try {
+    const { thirdParty, type } = actualData;
+    const tierType = type === 'receivable' ? 'client' : 'fournisseur';
+    let newTierData = null;
+
+    const existingTier = tiers.find(t => t.name.toLowerCase() === thirdParty.toLowerCase());
+    if (!existingTier && thirdParty) {
+      const { data: insertedTier, error: tierError } = await supabase
+        .from('tiers')
+        .upsert({ name: thirdParty, type: tierType, user_id: user.id }, { onConflict: 'user_id,name,type' })
+        .select().single();
+      if (tierError) throw tierError;
+      newTierData = insertedTier;
+    }
+    
+    const dataToSave = {
+      project_id: actualData.projectId,
+      user_id: user.id,
+      type: actualData.type,
+      category: actualData.category,
+      third_party: actualData.thirdParty,
+      description: actualData.description,
+      date: actualData.date,
+      amount: actualData.amount,
+      status: actualData.status,
+      is_off_budget: actualData.isOffBudget,
+    };
+
+    let savedActual;
+    if (editingActual) {
+      const { data, error } = await supabase.from('actual_transactions').update(dataToSave).eq('id', editingActual.id).select().single();
+      if (error) throw error;
+      savedActual = data;
+    } else {
+      const { data, error } = await supabase.from('actual_transactions').insert(dataToSave).select().single();
+      if (error) throw error;
+      savedActual = data;
+    }
+
+    const finalActualData = {
+        id: savedActual.id,
+        budgetId: savedActual.budget_id,
+        projectId: savedActual.project_id,
+        type: savedActual.type,
+        category: savedActual.category,
+        thirdParty: savedActual.third_party,
+        description: savedActual.description,
+        date: savedActual.date,
+        amount: savedActual.amount,
+        status: savedActual.status,
+        isOffBudget: savedActual.is_off_budget,
+        payments: []
+    };
+
+    dispatch({
+      type: 'SAVE_ACTUAL_SUCCESS',
+      payload: {
+        finalActualData,
+        newTier: newTierData ? { id: newTierData.id, name: newTierData.name, type: newTierData.type } : null,
+      }
+    });
+    dispatch({ type: 'ADD_TOAST', payload: { message: 'Transaction enregistrée.', type: 'success' } });
+
+  } catch (error) {
+    console.error("Error saving actual transaction:", error);
+    dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+  }
+};
+
+export const deleteActual = async (dispatch, actualId) => {
+    try {
+        const { error } = await supabase.from('actual_transactions').delete().eq('id', actualId);
+        if (error) throw error;
+        dispatch({ type: 'DELETE_ACTUAL_SUCCESS', payload: actualId });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Transaction supprimée.', type: 'success' } });
+    } catch (error) {
+        console.error("Error deleting actual:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};
+
+export const recordPayment = async (dispatch, { actualId, paymentData, allActuals }) => {
+    try {
+        const { data: payment, error: paymentError } = await supabase.from('payments').insert({
+            actual_id: actualId,
+            payment_date: paymentData.paymentDate,
+            paid_amount: paymentData.paidAmount,
+            cash_account: paymentData.cashAccount,
+        }).select().single();
+        if (paymentError) throw paymentError;
+
+        const actual = Object.values(allActuals).flat().find(a => a.id === actualId);
+        const totalPaid = (actual.payments || []).reduce((sum, p) => sum + p.paidAmount, 0) + paymentData.paidAmount;
+        let newStatus = actual.status;
+        if (paymentData.isFinalPayment || totalPaid >= actual.amount) {
+            newStatus = actual.type === 'payable' ? 'paid' : 'received';
+        } else if (totalPaid > 0) {
+            newStatus = actual.type === 'payable' ? 'partially_paid' : 'partially_received';
+        }
+
+        const { data: updatedActual, error: actualError } = await supabase
+            .from('actual_transactions')
+            .update({ status: newStatus })
+            .eq('id', actualId)
+            .select('*, payments(*)')
+            .single();
+        if (actualError) throw actualError;
+
+        dispatch({ type: 'RECORD_PAYMENT_SUCCESS', payload: { updatedActual } });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Paiement enregistré.', type: 'success' } });
+    } catch (error) {
+        console.error("Error recording payment:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};
+
+export const writeOffActual = async (dispatch, actualId) => {
+    try {
+        const { data: updatedActual, error } = await supabase
+            .from('actual_transactions')
+            .update({ 
+                status: 'written_off',
+                description: `(Write-off) ${new Date().toLocaleDateString()}` 
+            })
+            .eq('id', actualId)
+            .select()
+            .single();
+
+        if (error) throw error;
+        
+        dispatch({ type: 'WRITE_OFF_ACTUAL_SUCCESS', payload: updatedActual });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Transaction passée en perte.', type: 'success' } });
+
+    } catch (error) {
+        console.error("Error writing off actual:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};

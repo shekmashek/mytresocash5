@@ -322,10 +322,6 @@ const AppLayout = () => {
         });
     };
 
-    if (focusView !== 'none') {
-        return <FocusView />;
-    }
-
     return (
         <div ref={dragConstraintsRef} className="flex min-h-screen bg-background">
             <AnimatePresence>{isTourActive && <GuidedTour />}</AnimatePresence>
@@ -354,6 +350,10 @@ const AppLayout = () => {
                 </main>
             </div>
             
+            <AnimatePresence>
+                {focusView !== 'none' && <FocusView />}
+            </AnimatePresence>
+
             <SettingsDrawerWrapper activeDrawer={activeSettingsDrawer} onClose={() => dispatch({ type: 'SET_ACTIVE_SETTINGS_DRAWER', payload: null })} />
             
             {isBudgetModalOpen && (

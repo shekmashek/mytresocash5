@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { PiggyBank, Lock, FileWarning, Hourglass, Banknote, Coins, PlusCircle, ArrowRightLeft, Landmark, Smartphone, Wallet, LineChart } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { PiggyBank, Lock, FileWarning, Hourglass, Banknote, Coins, PlusCircle, ArrowRightLeft, Landmark, Smartphone, Wallet, LineChart, ChevronDown } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useBudget } from '../context/BudgetContext';
 import { formatCurrency } from '../utils/formatting';
 import { getTodayInTimezone } from '../utils/budgetCalculations';
@@ -13,6 +14,15 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
 
   const [isBalanceDrawerOpen, setIsBalanceDrawerOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState(null);
+  const [collapsedSections, setCollapsedSections] = useState({
+    balances: true,
+    overdue: true,
+    loans: true,
+  });
+
+  const toggleSection = (section) => {
+    setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
 
   const isConsolidated = activeProjectId === 'consolidated';
 
@@ -209,6 +219,11 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
       provisions: Lock,
   };
 
+  const motionVariants = {
+    open: { opacity: 1, height: 'auto', marginTop: '0.5rem' },
+    collapsed: { opacity: 0, height: 0, marginTop: '0rem' }
+  };
+
   return (
     <>
       <aside className={`flex flex-col bg-surface shadow-lg transition-all duration-300 ease-in-out ${isCollapsed ? 'w-20' : 'w-64'}`}>
@@ -226,7 +241,7 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
         </div>
 
         <div className="flex items-center justify-center px-4 py-4 border-b">
-          <div className={`w-full transition-all duration-300 ${isCollapsed ? 'space-y-2' : 'space-y-2'}`}>
+          <div className={`w-full transition-all duration-300`}>
               <div className={`flex items-center gap-2 ${isCollapsed ? 'justify-center' : ''}`} title="Total Cash Actionnable">
                   <Wallet className="w-5 h-5 shrink-0 text-gray-500" />
                   {!isCollapsed && (
@@ -236,74 +251,97 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
                       </div>
                   )}
               </div>
-              <div className={`flex items-center gap-2 ${isCollapsed ? 'justify-center' : ''}`} title="Total Épargne">
-                  <PiggyBank className="w-5 h-5 shrink-0 text-gray-500" />
-                  {!isCollapsed && (
-                      <div className="flex justify-between items-center w-full">
-                          <span className="font-medium text-sm text-text-secondary">Épargne</span>
-                          <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.savings}</span>
-                      </div>
-                  )}
-              </div>
-              <div className={`flex items-center gap-2 ${isCollapsed ? 'justify-center' : ''}`} title="Total Provisions">
-                  <Lock className="w-5 h-5 shrink-0 text-gray-500" />
-                  {!isCollapsed && (
-                      <div className="flex justify-between items-center w-full">
-                          <span className="font-medium text-sm text-text-secondary">Provision</span>
-                          <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.provisions}</span>
-                      </div>
-                  )}
-              </div>
               
-              {!isCollapsed && <hr className="my-2 border-secondary-200" />}
-
-              <button onClick={() => handleOverdueClick('payable')} className="w-full text-left rounded-lg transition-colors hover:bg-secondary-100">
-                  <div className={`flex items-center gap-2 ${isCollapsed ? 'justify-center' : ''}`} title="Total des factures fournisseurs dont la date d'échéance est passée">
-                      <FileWarning className="w-5 h-5 shrink-0 text-gray-500" />
-                      {!isCollapsed && (
-                          <div className="flex justify-between items-center w-full">
-                              <span className="font-medium text-sm text-text-secondary">Fournisseurs</span>
-                              <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.overduePayables}</span>
+              {!isCollapsed && (
+                <>
+                  <div className="mt-2">
+                    <button onClick={() => toggleSection('balances')} className="w-full flex justify-between items-center text-left py-1 text-gray-500 hover:text-gray-800">
+                      <span className="text-xs font-bold uppercase tracking-wider">Analyse des Soldes</span>
+                      <ChevronDown className={`w-4 h-4 transition-transform ${collapsedSections.balances ? '-rotate-90' : ''}`} />
+                    </button>
+                    <AnimatePresence>
+                      {!collapsedSections.balances && (
+                        <motion.div initial="collapsed" animate="open" exit="collapsed" variants={motionVariants} transition={{ duration: 0.3, ease: "easeInOut" }} className="overflow-hidden pl-2 space-y-2">
+                          <div className="flex items-center gap-2" title="Total Épargne">
+                              <PiggyBank className="w-5 h-5 shrink-0 text-gray-500" />
+                              <div className="flex justify-between items-center w-full">
+                                  <span className="font-medium text-sm text-text-secondary">Épargne</span>
+                                  <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.savings}</span>
+                              </div>
                           </div>
-                      )}
-                  </div>
-              </button>
-              <button onClick={() => handleOverdueClick('receivable')} className="w-full text-left rounded-lg transition-colors hover:bg-secondary-100">
-                  <div className={`flex items-center gap-2 ${isCollapsed ? 'justify-center' : ''}`} title="Total des factures clients dont la date d'échéance est passée">
-                      <Hourglass className="w-5 h-5 shrink-0 text-gray-500" />
-                      {!isCollapsed && (
-                          <div className="flex justify-between items-center w-full">
-                              <span className="font-medium text-sm text-text-secondary">Clients</span>
-                              <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.overdueReceivables}</span>
+                          <div className="flex items-center gap-2" title="Total Provisions">
+                              <Lock className="w-5 h-5 shrink-0 text-gray-500" />
+                              <div className="flex justify-between items-center w-full">
+                                  <span className="font-medium text-sm text-text-secondary">Provision</span>
+                                  <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.provisions}</span>
+                              </div>
                           </div>
+                        </motion.div>
                       )}
+                    </AnimatePresence>
                   </div>
-              </button>
-
-              {!isCollapsed && <hr className="my-2 border-secondary-200" />}
-
-              <button onClick={() => handleNavigate('borrowings')} className={`w-full text-left rounded-lg transition-colors ${currentView === 'borrowings' ? 'bg-secondary-100' : 'hover:bg-secondary-100'}`}>
-                  <div className={`flex items-center gap-2 ${isCollapsed ? 'justify-center' : ''}`} title="Gérer vos emprunts">
-                      <Banknote className="w-5 h-5 shrink-0 text-gray-500" />
-                      {!isCollapsed && (
-                          <div className="flex justify-between items-center w-full">
-                              <span className="font-medium text-sm text-text-secondary">Vos emprunts</span>
-                              <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.totalDebts}</span>
-                          </div>
+                  <div className="mt-2">
+                    <button onClick={() => toggleSection('overdue')} className="w-full flex justify-between items-center text-left py-1 text-gray-500 hover:text-gray-800">
+                      <span className="text-xs font-bold uppercase tracking-wider">Suivi des Retards</span>
+                      <ChevronDown className={`w-4 h-4 transition-transform ${collapsedSections.overdue ? '-rotate-90' : ''}`} />
+                    </button>
+                    <AnimatePresence>
+                      {!collapsedSections.overdue && (
+                        <motion.div initial="collapsed" animate="open" exit="collapsed" variants={motionVariants} transition={{ duration: 0.3, ease: "easeInOut" }} className="overflow-hidden pl-2 space-y-2">
+                          <button onClick={() => handleOverdueClick('payable')} className="w-full text-left rounded-lg transition-colors hover:bg-secondary-100">
+                            <div className="flex items-center gap-2" title="Total des factures fournisseurs dont la date d'échéance est passée">
+                                <FileWarning className="w-5 h-5 shrink-0 text-gray-500" />
+                                <div className="flex justify-between items-center w-full">
+                                    <span className="font-medium text-sm text-text-secondary">Fournisseurs</span>
+                                    <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.overduePayables}</span>
+                                </div>
+                            </div>
+                          </button>
+                          <button onClick={() => handleOverdueClick('receivable')} className="w-full text-left rounded-lg transition-colors hover:bg-secondary-100">
+                            <div className="flex items-center gap-2" title="Total des factures clients dont la date d'échéance est passée">
+                                <Hourglass className="w-5 h-5 shrink-0 text-gray-500" />
+                                <div className="flex justify-between items-center w-full">
+                                    <span className="font-medium text-sm text-text-secondary">Clients</span>
+                                    <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.overdueReceivables}</span>
+                                </div>
+                            </div>
+                          </button>
+                        </motion.div>
                       )}
+                    </AnimatePresence>
                   </div>
-              </button>
-              <button onClick={() => handleNavigate('loans')} className={`w-full text-left rounded-lg transition-colors ${currentView === 'loans' ? 'bg-secondary-100' : 'hover:bg-secondary-100'}`}>
-                  <div className={`flex items-center gap-2 ${isCollapsed ? 'justify-center' : ''}`} title="Gérer vos prêts">
-                      <Coins className="w-5 h-5 shrink-0 text-gray-500" />
-                      {!isCollapsed && (
-                          <div className="flex justify-between items-center w-full">
-                              <span className="font-medium text-sm text-text-secondary">Vos prêts</span>
-                              <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.totalCredits}</span>
-                          </div>
+                  <div className="mt-2">
+                    <button onClick={() => toggleSection('loans')} className="w-full flex justify-between items-center text-left py-1 text-gray-500 hover:text-gray-800">
+                      <span className="text-xs font-bold uppercase tracking-wider">Dettes & Prêts</span>
+                      <ChevronDown className={`w-4 h-4 transition-transform ${collapsedSections.loans ? '-rotate-90' : ''}`} />
+                    </button>
+                    <AnimatePresence>
+                      {!collapsedSections.loans && (
+                        <motion.div initial="collapsed" animate="open" exit="collapsed" variants={motionVariants} transition={{ duration: 0.3, ease: "easeInOut" }} className="overflow-hidden pl-2 space-y-2">
+                          <button onClick={() => handleNavigate('borrowings')} className={`w-full text-left rounded-lg transition-colors ${currentView === 'borrowings' ? 'bg-secondary-100' : 'hover:bg-secondary-100'}`}>
+                            <div className="flex items-center gap-2" title="Gérer vos emprunts">
+                                <Banknote className="w-5 h-5 shrink-0 text-gray-500" />
+                                <div className="flex justify-between items-center w-full">
+                                    <span className="font-medium text-sm text-text-secondary">Vos emprunts</span>
+                                    <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.totalDebts}</span>
+                                </div>
+                            </div>
+                          </button>
+                          <button onClick={() => handleNavigate('loans')} className={`w-full text-left rounded-lg transition-colors ${currentView === 'loans' ? 'bg-secondary-100' : 'hover:bg-secondary-100'}`}>
+                            <div className="flex items-center gap-2" title="Gérer vos prêts">
+                                <Coins className="w-5 h-5 shrink-0 text-gray-500" />
+                                <div className="flex justify-between items-center w-full">
+                                    <span className="font-medium text-sm text-text-secondary">Vos prêts</span>
+                                    <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.totalCredits}</span>
+                                </div>
+                            </div>
+                          </button>
+                        </motion.div>
                       )}
+                    </AnimatePresence>
                   </div>
-              </button>
+                </>
+              )}
           </div>
         </div>
 

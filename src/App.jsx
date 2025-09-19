@@ -23,6 +23,7 @@ import ProfilePage from './pages/ProfilePage';
 import SecurityPage from './pages/SecurityPage';
 import SubscriptionPage from './pages/SubscriptionPage';
 import DeleteAccountPage from './pages/DeleteAccountPage';
+import DisplaySettingsPage from './pages/DisplaySettingsPage';
 
 const toastIcons = {
   success: <CheckCircle className="w-5 h-5" />,
@@ -144,6 +145,7 @@ function App() {
               <Route path="profil" element={<ProfilePage />} />
               <Route path="securite" element={<SecurityPage />} />
               <Route path="abonnement" element={<SubscriptionPage />} />
+              <Route path="display-settings" element={<DisplaySettingsPage />} />
               <Route path="delete-account" element={<DeleteAccountPage />} />
               <Route path="factures" element={<UnderConstructionView title="Factures" />} />
               <Route path="aide" element={<UnderConstructionView title="Centre d'aide" />} />

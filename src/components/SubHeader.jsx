@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { supabase } from '../utils/supabase';
-import { Save, User, Shield, CreditCard, FileText, HelpCircle, LogOut, Table, ArrowDownUp, HandCoins, PieChart, Layers, BookOpen, Cog, Users, FolderKanban, Wallet, Archive, Clock, FolderCog, Globe, Target, Calendar, Plus, FilePlus, Banknote, Maximize, AreaChart, Receipt, Hash, LayoutDashboard, Trash2 } from 'lucide-react';
+import { Save, User, Shield, CreditCard, FileText, HelpCircle, LogOut, Table, ArrowDownUp, HandCoins, PieChart, Layers, BookOpen, Cog, Users, FolderKanban, Wallet, Archive, Clock, FolderCog, Globe, Target, Calendar, Plus, FilePlus, Banknote, Maximize, AreaChart, Receipt, Hash, LayoutDashboard, Trash2, Eye } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from '../utils/i18n';
 import ProjectSwitcher from './ProjectSwitcher';
@@ -34,8 +34,6 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [isCurrencyPopoverOpen, setIsCurrencyPopoverOpen] = useState(false);
-  const currencyPopoverRef = useRef(null);
   const [isLangPopoverOpen, setIsLangPopoverOpen] = useState(false);
   const langPopoverRef = useRef(null);
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
@@ -45,20 +43,12 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
   const [isNewMenuOpen, setIsNewMenuOpen] = useState(false);
   const newMenuRef = useRef(null);
 
-  const [isUnitPopoverOpen, setIsUnitPopoverOpen] = useState(false);
-  const unitPopoverRef = useRef(null);
-  const [isDecimalPopoverOpen, setIsDecimalPopoverOpen] = useState(false);
-  const decimalPopoverRef = useRef(null);
-
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (currencyPopoverRef.current && !currencyPopoverRef.current.contains(event.target)) setIsCurrencyPopoverOpen(false);
       if (langPopoverRef.current && !langPopoverRef.current.contains(event.target)) setIsLangPopoverOpen(false);
       if (avatarMenuRef.current && !avatarMenuRef.current.contains(event.target)) setIsAvatarMenuOpen(false);
       if (settingsPopoverRef.current && !settingsPopoverRef.current.contains(event.target)) setIsSettingsOpen(false);
       if (newMenuRef.current && !newMenuRef.current.contains(event.target)) setIsNewMenuOpen(false);
-      if (unitPopoverRef.current && !unitPopoverRef.current.contains(event.target)) setIsUnitPopoverOpen(false);
-      if (decimalPopoverRef.current && !decimalPopoverRef.current.contains(event.target)) setIsDecimalPopoverOpen(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -67,10 +57,6 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
   const handleLanguageChange = (newLang) => {
     dispatch({ type: 'UPDATE_SETTINGS', payload: { ...settings, language: newLang } });
     setIsLangPopoverOpen(false);
-  };
-  
-  const handleSettingsChange = (key, value) => {
-      dispatch({ type: 'UPDATE_SETTINGS', payload: { ...settings, [key]: value } });
   };
 
   const handleLogout = async () => {
@@ -115,6 +101,7 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
 
   const settingsItems = [
     { id: 'projectSettings', label: 'Paramètres du Projet', icon: FolderCog, color: 'text-blue-500' },
+    { id: '/app/display-settings', label: 'Affichage et Devise', icon: Eye, color: 'text-green-500' },
     { id: 'categoryManagement', label: t('advancedSettings.categories'), icon: FolderKanban, color: 'text-orange-500' },
     { id: 'tiersManagement', label: t('advancedSettings.tiers'), icon: Users, color: 'text-pink-500' },
     { id: 'cashAccounts', label: t('advancedSettings.accounts'), icon: Wallet, color: 'text-teal-500' },
@@ -132,77 +119,22 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
   ];
 
   const handleSettingsItemClick = (itemId) => {
-    if (typeof onOpenSettingsDrawer === 'function') {
+    if (itemId.startsWith('/app/')) {
+        handleNavigate(itemId);
+    } else if (typeof onOpenSettingsDrawer === 'function') {
       onOpenSettingsDrawer(itemId);
     }
     setIsSettingsOpen(false);
   };
 
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/app/dashboard' },
-    { id: 'trezo', label: 'Trezo', icon: Table, path: '/app/trezo' },
-    { id: 'flux', label: 'Flux', icon: AreaChart, path: '/app/flux' },
-    { id: 'echeancier', label: 'Echeancier', icon: Calendar, path: '/app/echeancier' },
-    { id: 'scenarios', label: 'Scénarios', icon: Layers, path: '/app/scenarios' },
-    { id: 'analyse', label: 'Analyse', icon: PieChart, path: '/app/analyse' },
+    { id: 'dashboard', label: 'Dashboard', path: '/app/dashboard' },
+    { id: 'trezo', label: 'Trezo', path: '/app/trezo' },
+    { id: 'flux', label: 'Flux', path: '/app/flux' },
+    { id: 'echeancier', label: 'Echeancier', path: '/app/echeancier' },
+    { id: 'scenarios', label: 'Scénarios', path: '/app/scenarios' },
+    { id: 'analyse', label: 'Analyse', path: '/app/analyse' },
   ];
-
-  const CurrencySelector = () => {
-    const { state: budgetState, dispatch: budgetDispatch } = useBudget();
-    const { settings: budgetSettings } = budgetState;
-    const [currency, setCurrency] = useState(budgetSettings.currency);
-    const [customCurrency, setCustomCurrency] = useState('');
-    const [isCustom, setIsCustom] = useState(false);
-    const predefinedCurrencies = ['€', '$', '£', 'Ar'];
-
-    useEffect(() => {
-        if (predefinedCurrencies.includes(budgetSettings.currency)) {
-            setCurrency(budgetSettings.currency);
-            setIsCustom(false);
-        } else {
-            setCurrency('custom');
-            setCustomCurrency(budgetSettings.currency);
-            setIsCustom(true);
-        }
-    }, [budgetSettings.currency]);
-
-    const handleGlobalCurrencyChange = (newCurrency) => {
-        budgetDispatch({ type: 'UPDATE_SETTINGS', payload: { ...budgetSettings, currency: newCurrency } });
-    };
-
-    const handleCurrencySelection = (value) => {
-        setCurrency(value);
-        if (value === 'custom') {
-            setIsCustom(true);
-        } else {
-            setIsCustom(false);
-            handleGlobalCurrencyChange(value);
-        }
-    };
-
-    const handleSaveCustomCurrency = () => {
-        if (customCurrency.trim()) {
-            handleGlobalCurrencyChange(customCurrency.trim());
-        }
-    };
-
-    return (
-        <div className="p-2 space-y-2">
-            <select value={currency} onChange={(e) => handleCurrencySelection(e.target.value)} className="w-full text-sm rounded-md border-secondary-300 focus:ring-primary-500 focus:border-primary-500 py-1">
-                {predefinedCurrencies.map(c => <option key={c} value={c}>{c}</option>)}
-                <option value="custom">{t('onboarding.other')}</option>
-            </select>
-            {isCustom && (
-                <div className="mt-2 flex items-center gap-2">
-                    <input type="text" value={customCurrency} onChange={(e) => setCustomCurrency(e.target.value)} placeholder="Ex: Ar" className="w-full text-sm px-2 py-1 border rounded-md border-secondary-300" maxLength="5" />
-                    <button onClick={handleSaveCustomCurrency} className="p-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md">
-                        <Save className="w-4 h-4" />
-                    </button>
-                </div>
-            )}
-        </div>
-    );
-  };
   
   const isProjectSwitcherHighlighted = isTourActive && tourHighlightId === '#project-switcher';
 
@@ -211,7 +143,6 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
     const status = profile.subscriptionStatus;
     if (status === 'lifetime') return 'Statut : Accès à Vie';
     if (status === 'active') {
-        // Here you could add logic to differentiate between monthly/annual if planId is used
         return 'Statut : Abonnement Pro';
     }
     const trialEndDate = profile.trialEndsAt ? new Date(profile.trialEndsAt) :
@@ -246,14 +177,13 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
                     key={item.id}
                     id={`tour-step-${item.id}`}
                     onClick={() => handleNavigate(item.path)}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-semibold transition-all duration-200 ${
+                    className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all duration-200 ${
                       isActive
                         ? 'bg-white text-gray-900 shadow-sm'
                         : 'text-gray-600 hover:bg-gray-200 hover:text-gray-800'
                     } ${isHighlighted ? 'relative z-[1000] ring-4 ring-blue-500 ring-offset-4 ring-offset-black/60' : ''}`}
                     title={item.label}
                   >
-                    <item.icon className="w-4 h-4" />
                     <span>{item.label}</span>
                   </button>
                 );
@@ -300,73 +230,6 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
                   </AnimatePresence>
               </div>
               <div className="flex items-center gap-2">
-                  <div className="relative" ref={currencyPopoverRef}>
-                      <button 
-                          onClick={() => setIsCurrencyPopoverOpen(p => !p)}
-                          className="px-2 py-1 text-gray-600 hover:text-gray-900 transition-colors"
-                          title="Changer la devise globale"
-                      >
-                          <span className="text-sm">{settings.currency}</span>
-                      </button>
-                      <AnimatePresence>
-                      {isCurrencyPopoverOpen && (
-                          <motion.div 
-                              initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                              animate={{ opacity: 1, scale: 1, y: 0 }}
-                              exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                              className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border z-20"
-                          >
-                              <CurrencySelector />
-                          </motion.div>
-                      )}
-                      </AnimatePresence>
-                  </div>
-                  <div className="relative" ref={unitPopoverRef}>
-                      <button 
-                          onClick={() => setIsUnitPopoverOpen(p => !p)}
-                          className="px-2 py-1 text-gray-600 hover:text-gray-900 transition-colors"
-                          title="Changer l'unité d'affichage"
-                      >
-                          <span className="text-sm">U</span>
-                      </button>
-                      <AnimatePresence>
-                          {isUnitPopoverOpen && (
-                              <motion.div
-                                  initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                                  exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                  className="absolute right-0 top-full mt-2 w-40 bg-white rounded-lg shadow-lg border z-20 p-1"
-                              >
-                                  <button onClick={() => { handleSettingsChange('displayUnit', 'standard'); setIsUnitPopoverOpen(false); }} className="w-full text-left text-sm px-3 py-1.5 rounded hover:bg-gray-100">{t('sidebar.standard')}</button>
-                                  <button onClick={() => { handleSettingsChange('displayUnit', 'thousands'); setIsUnitPopoverOpen(false); }} className="w-full text-left text-sm px-3 py-1.5 rounded hover:bg-gray-100">{t('sidebar.thousands')}</button>
-                                  <button onClick={() => { handleSettingsChange('displayUnit', 'millions'); setIsUnitPopoverOpen(false); }} className="w-full text-left text-sm px-3 py-1.5 rounded hover:bg-gray-100">{t('sidebar.millions')}</button>
-                              </motion.div>
-                          )}
-                      </AnimatePresence>
-                  </div>
-                  <div className="relative" ref={decimalPopoverRef}>
-                      <button 
-                          onClick={() => setIsDecimalPopoverOpen(p => !p)}
-                          className="px-2 py-1 text-gray-600 hover:text-gray-900 transition-colors"
-                          title="Changer le nombre de décimales"
-                      >
-                          <span className="text-sm">#</span>
-                      </button>
-                      <AnimatePresence>
-                          {isDecimalPopoverOpen && (
-                              <motion.div
-                                  initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                                  exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                  className="absolute right-0 top-full mt-2 w-24 bg-white rounded-lg shadow-lg border z-20 p-1"
-                              >
-                                  <button onClick={() => { handleSettingsChange('decimalPlaces', 0); setIsDecimalPopoverOpen(false); }} className="w-full text-left text-sm px-3 py-1.5 rounded hover:bg-gray-100">0</button>
-                                  <button onClick={() => { handleSettingsChange('decimalPlaces', 1); setIsDecimalPopoverOpen(false); }} className="w-full text-left text-sm px-3 py-1.5 rounded hover:bg-gray-100">1</button>
-                                  <button onClick={() => { handleSettingsChange('decimalPlaces', 2); setIsDecimalPopoverOpen(false); }} className="w-full text-left text-sm px-3 py-1.5 rounded hover:bg-gray-100">2</button>
-                              </motion.div>
-                          )}
-                      </AnimatePresence>
-                  </div>
                   <div className="relative" ref={langPopoverRef}>
                       <button
                           onClick={() => setIsLangPopoverOpen(p => !p)}

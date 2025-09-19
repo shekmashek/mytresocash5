@@ -6,6 +6,7 @@ import { getTodayInTimezone, getEntryAmountForPeriod, getActualAmountForPeriod }
 import SparklineChart from './SparklineChart';
 import ReactECharts from 'echarts-for-react';
 import MonthlyBudgetSummary from './MonthlyBudgetSummary';
+import ExpertTipWidget from './ExpertTipWidget';
 
 const DashboardView = () => {
   const { state, dispatch } = useBudget();
@@ -332,6 +333,8 @@ const DashboardView = () => {
           </div>
         </div>
       </div>
+
+      <ExpertTipWidget />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Left Column: Priority Actions */}

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { supabase } from '../utils/supabase';
-import { Shield, AlertTriangle, Download, Mail, BookUser, LogOut, Loader, Trash2 } from 'lucide-react';
+import { Shield, AlertTriangle, Download, Mail, LogOut, Loader, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { exportUserDataAsJSON } from '../utils/export';
 
@@ -32,6 +32,7 @@ const DeleteAccountPage = () => {
             dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la suppression : ${deleteError.message}`, type: 'error' } });
         } else {
             await supabase.auth.signOut();
+            // The auth listener in App.jsx will handle the redirect
         }
     };
 
@@ -55,29 +56,32 @@ const DeleteAccountPage = () => {
                 </div>
 
                 <div>
-                    <h3 className="text-lg font-semibold text-gray-700 mb-3">Avant de partir...</h3>
+                    <h3 className="text-lg font-semibold text-gray-700 mb-4">Avant de partir...</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <button onClick={handleExport} className="flex flex-col items-center justify-center p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-center">
-                            <Download className="w-6 h-6 mb-2 text-gray-600" />
-                            <span className="font-semibold text-sm">Exporter mes données</span>
-                            <span className="text-xs text-gray-500">(Format JSON)</span>
-                        </button>
-                        <button onClick={() => navigate('/app/abonnement')} className="flex flex-col items-center justify-center p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-center">
-                            <LogOut className="w-6 h-6 mb-2 text-gray-600" />
-                            <span className="font-semibold text-sm">Se désabonner</span>
-                            <span className="text-xs text-gray-500">(Gérer votre plan)</span>
-                        </button>
-                        <a href="mailto:contact@trezocash.com" className="flex flex-col items-center justify-center p-4 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-center">
-                            <Mail className="w-6 h-6 mb-2 text-gray-600" />
-                            <span className="font-semibold text-sm">Nous contacter</span>
-                            <span className="text-xs text-gray-500">(Un problème technique ?)</span>
-                        </a>
+                        <div className="bg-gray-100 p-4 rounded-lg text-center flex flex-col">
+                            <Download className="w-8 h-8 mb-2 text-gray-600 mx-auto" />
+                            <h4 className="font-semibold text-sm">Exporter vos données</h4>
+                            <p className="text-xs text-gray-500 mb-3 flex-grow">Sauvegardez une copie de toutes vos informations au format JSON.</p>
+                            <button onClick={handleExport} className="text-sm font-medium text-blue-600 hover:underline mt-auto">Exporter</button>
+                        </div>
+                         <div className="bg-gray-100 p-4 rounded-lg text-center flex flex-col">
+                            <LogOut className="w-8 h-8 mb-2 text-gray-600 mx-auto" />
+                            <h4 className="font-semibold text-sm">Gérer l'abonnement</h4>
+                            <p className="text-xs text-gray-500 mb-3 flex-grow">Vous pouvez simplement vous désabonner au lieu de tout supprimer.</p>
+                            <button onClick={() => navigate('/app/abonnement')} className="text-sm font-medium text-blue-600 hover:underline mt-auto">Se désabonner</button>
+                        </div>
+                         <div className="bg-gray-100 p-4 rounded-lg text-center flex flex-col">
+                            <Mail className="w-8 h-8 mb-2 text-gray-600 mx-auto" />
+                            <h4 className="font-semibold text-sm">Nous contacter</h4>
+                            <p className="text-xs text-gray-500 mb-3 flex-grow">Un problème technique ? Une question ? Nous pouvons peut-être vous aider.</p>
+                            <a href="mailto:contact@trezocash.com" className="text-sm font-medium text-blue-600 hover:underline mt-auto">Envoyer un e-mail</a>
+                        </div>
                     </div>
                 </div>
 
                 <div>
                     <label htmlFor="reason" className="block text-lg font-semibold text-gray-700 mb-3">Pourquoi partez-vous ? (Optionnel)</label>
-                    <select id="reason" value={reason} onChange={(e) => setReason(e.target.value)} className="w-full max-w-md px-3 py-2 border rounded-lg">
+                    <select id="reason" value={reason} onChange={(e) => setReason(e.target.value)} className="w-full max-w-md px-3 py-2 border rounded-lg bg-white">
                         <option value="">Choisissez une raison...</option>
                         <option value="too_expensive">C'est trop cher</option>
                         <option value="missing_feature">Il manque une fonctionnalité importante</option>
@@ -86,24 +90,26 @@ const DeleteAccountPage = () => {
                     </select>
                 </div>
 
-                <div className="pt-8 border-t">
-                    <h3 className="text-lg font-semibold text-red-700 mb-3">Confirmation Finale</h3>
-                    <p className="text-sm text-gray-600 mb-4">Pour confirmer la suppression définitive de votre compte et de toutes vos données, veuillez taper "SUPPRIMER" dans le champ ci-dessous.</p>
-                    <input
-                        type="text"
-                        value={confirmText}
-                        onChange={(e) => setConfirmText(e.target.value)}
-                        className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
-                        placeholder='Tapez "SUPPRIMER"'
-                    />
-                    <button
-                        onClick={handleDeleteAccount}
-                        disabled={loading || confirmText !== 'SUPPRIMER'}
-                        className="mt-4 w-full max-w-md bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                    >
-                        {loading ? <Loader className="animate-spin" /> : <Trash2 />}
-                        Confirmer la suppression définitive
-                    </button>
+                <div className="pt-8 border-t border-red-200 mt-8">
+                    <div className="bg-red-50 p-6 rounded-lg border border-red-300">
+                        <h3 className="text-lg font-semibold text-red-700 mb-3">Zone de Danger : Confirmation Finale</h3>
+                        <p className="text-sm text-red-600 mb-4">Pour confirmer la suppression définitive de votre compte et de toutes vos données, veuillez taper "SUPPRIMER" dans le champ ci-dessous.</p>
+                        <input
+                            type="text"
+                            value={confirmText}
+                            onChange={(e) => setConfirmText(e.target.value)}
+                            className="w-full max-w-md px-3 py-2 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500"
+                            placeholder='Tapez "SUPPRIMER"'
+                        />
+                        <button
+                            onClick={handleDeleteAccount}
+                            disabled={loading || confirmText !== 'SUPPRIMER'}
+                            className="mt-4 w-full max-w-md bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        >
+                            {loading ? <Loader className="animate-spin" /> : <Trash2 />}
+                            Je comprends les conséquences, supprimer mon compte
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

@@ -21,17 +21,24 @@ const PublicLayout = ({ onLogin, onSignUp, children }) => {
           element.scrollIntoView({ behavior: 'smooth' });
         }
       }, 100);
+    } else {
+        window.scrollTo(0, 0);
     }
   }, [location]);
 
-  const handleScrollTo = (id) => {
-    if (location.pathname !== '/') {
-      navigate(`/#${id}`);
-    } else {
-      const element = document.getElementById(id);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth' });
+  const handleNavClick = (path) => {
+    if (path.startsWith('/#')) {
+      const id = path.substring(2);
+      if (location.pathname !== '/') {
+        navigate(`/${path}`);
+      } else {
+        const element = document.getElementById(id);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }
       }
+    } else {
+      navigate(path);
     }
     setIsMobileMenuOpen(false);
   };
@@ -42,10 +49,11 @@ const PublicLayout = ({ onLogin, onSignUp, children }) => {
   };
   
   const navLinks = [
-    { label: 'Fonctionnalités', id: 'fonctionnalites' },
-    { label: 'Tarifs', id: 'tarifs' },
-    { label: 'FAQ', id: 'faq' },
-    { label: 'Contact', id: 'contact' },
+    { label: 'Fonctionnalités', path: '/#fonctionnalites' },
+    { label: 'Tarifs', path: '/#tarifs' },
+    { label: 'À propos', path: '/a-propos' },
+    { label: 'FAQ', path: '/#faq' },
+    { label: 'Contact', path: '/#contact' },
   ];
 
   return (
@@ -59,9 +67,9 @@ const PublicLayout = ({ onLogin, onSignUp, children }) => {
           
           <div className="flex items-center">
             <nav className="hidden md:flex items-center gap-6 mr-6">
-              <button onClick={() => handleScrollTo('accueil')} className="text-sm font-semibold text-gray-600 hover:text-blue-600">Accueil</button>
+              <button onClick={() => handleNavClick('/')} className="text-sm font-semibold text-gray-600 hover:text-blue-600">Accueil</button>
               {navLinks.map(link => (
-                <button key={link.id} onClick={() => handleScrollTo(link.id)} className="text-sm font-semibold text-gray-600 hover:text-blue-600">{link.label}</button>
+                <button key={link.label} onClick={() => handleNavClick(link.path)} className="text-sm font-semibold text-gray-600 hover:text-blue-600">{link.label}</button>
               ))}
               <div className="relative">
                 <button onClick={() => setIsLangMenuOpen(!isLangMenuOpen)} className="flex items-center gap-1 text-sm font-semibold text-gray-600 hover:text-blue-600">
@@ -123,9 +131,9 @@ const PublicLayout = ({ onLogin, onSignUp, children }) => {
               </button>
             </div>
             <nav className="flex flex-col items-center gap-8">
-              <button onClick={() => handleScrollTo('accueil')} className="text-lg font-semibold text-gray-700">Accueil</button>
+              <button onClick={() => handleNavClick('/')} className="text-lg font-semibold text-gray-700">Accueil</button>
               {navLinks.map(link => (
-                <button key={link.id} onClick={() => handleScrollTo(link.id)} className="text-lg font-semibold text-gray-700">{link.label}</button>
+                <button key={link.label} onClick={() => handleNavClick(link.path)} className="text-lg font-semibold text-gray-700">{link.label}</button>
               ))}
               <hr className="w-full my-4" />
               <button onClick={onLogin} className="text-lg font-semibold text-gray-700">Se connecter</button>
@@ -136,7 +144,7 @@ const PublicLayout = ({ onLogin, onSignUp, children }) => {
       </AnimatePresence>
 
       <main className="flex-grow">
-        {children}
+        <Outlet />
       </main>
 
       <footer className="bg-gray-100 border-t">
@@ -149,7 +157,8 @@ const PublicLayout = ({ onLogin, onSignUp, children }) => {
             </a>
           </div>
           <div className="mt-12 pt-8 border-t border-gray-200 text-center">
-            <div className="flex justify-center gap-6 mb-4">
+            <div className="flex justify-center flex-wrap gap-x-6 gap-y-2 mb-4">
+              <Link to="/a-propos" className="text-sm text-gray-500 hover:underline">À propos de nous</Link>
               <Link to="/cgu" className="text-sm text-gray-500 hover:underline">CGU</Link>
               <Link to="/rgpd" className="text-sm text-gray-500 hover:underline">RGPD</Link>
               <Link to="/cookies" className="text-sm text-gray-500 hover:underline">Cookies</Link>

@@ -7,6 +7,7 @@ import { useTranslation } from '../utils/i18n';
 import ProjectSwitcher from './ProjectSwitcher';
 import FlagIcon from './FlagIcon';
 import { useNavigate, useLocation } from 'react-router-dom';
+import SubscriptionBadge from './SubscriptionBadge';
 
 const SettingsLink = ({ item, onClick }) => {
   const Icon = item.icon;
@@ -28,7 +29,7 @@ const SettingsLink = ({ item, onClick }) => {
 
 const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isConsolidated }) => {
   const { state, dispatch } = useBudget();
-  const { settings, isTourActive, tourHighlightId } = state;
+  const { settings, isTourActive, tourHighlightId, profile, session } = state;
   const { t, lang } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -204,6 +205,25 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
   };
   
   const isProjectSwitcherHighlighted = isTourActive && tourHighlightId === '#project-switcher';
+
+  const subscriptionDetails = useMemo(() => {
+    if (!profile) return null;
+    const status = profile.subscriptionStatus;
+    if (status === 'lifetime') return 'Statut : Accès à Vie';
+    if (status === 'active') {
+        // Here you could add logic to differentiate between monthly/annual if planId is used
+        return 'Statut : Abonnement Pro';
+    }
+    const trialEndDate = profile.trialEndsAt ? new Date(profile.trialEndsAt) :
+                         session?.user?.created_at ? new Date(new Date(session.user.created_at).setDate(new Date(session.user.created_at).getDate() + 14)) : null;
+    if (trialEndDate) {
+        const daysLeft = Math.max(0, Math.ceil((trialEndDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)));
+        if (daysLeft > 0) {
+            return `Statut : Essai gratuit (${daysLeft} jours restants)`;
+        }
+    }
+    return 'Statut : Essai terminé';
+  }, [profile, session]);
 
   return (
     <>
@@ -416,53 +436,57 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
                           )}
                       </AnimatePresence>
                   </div>
-                  <div className="relative" ref={avatarMenuRef}>
-                      <button 
-                          onClick={() => setIsAvatarMenuOpen(p => !p)}
-                          className="p-2 text-gray-600 hover:text-gray-900 transition-colors"
-                          title="Profil utilisateur"
-                      >
-                          <User className="w-5 h-5" />
-                      </button>
-                      <AnimatePresence>
-                          {isAvatarMenuOpen && (
-                              <motion.div
-                                  initial={{ opacity: 0, scale: 0.9, y: -10 }}
-                                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                                  exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                                  className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border z-20"
-                              >
-                                  <div className="px-4 py-3 border-b">
-                                      <p className="text-sm font-semibold text-gray-800">{state.profile?.fullName || 'Utilisateur'}</p>
-                                      <p className="text-xs text-gray-500 truncate">{state.session?.user?.email}</p>
-                                  </div>
-                                  <div className="p-1">
-                                      {menuItems.map((item) => (
-                                          <button 
-                                              key={item.title}
-                                              onClick={() => handleNavigate(item.path)}
-                                              className={`w-full text-left flex items-center gap-3 px-3 py-2 text-sm rounded-md ${
-                                                  item.isDestructive 
-                                                  ? 'text-red-600 hover:bg-red-50' 
-                                                  : 'text-gray-700 hover:bg-gray-100'
-                                              }`}
-                                          >
-                                              <item.icon className="w-4 h-4" />
-                                              <span>{item.title}</span>
-                                          </button>
-                                      ))}
-                                      <div className="h-px bg-gray-200 my-1 mx-1"></div>
-                                      <button 
-                                          onClick={handleLogout}
-                                          className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-red-600 rounded-md hover:bg-red-50"
-                                      >
-                                          <LogOut className="w-4 h-4" />
-                                          <span>Se déconnecter</span>
-                                      </button>
-                                  </div>
-                              </motion.div>
-                          )}
-                      </AnimatePresence>
+                  <div className="flex items-center gap-2">
+                    <SubscriptionBadge />
+                    <div className="relative" ref={avatarMenuRef}>
+                        <button 
+                            onClick={() => setIsAvatarMenuOpen(p => !p)}
+                            className="p-2 text-gray-600 hover:text-gray-900 transition-colors"
+                            title="Profil utilisateur"
+                        >
+                            <User className="w-5 h-5" />
+                        </button>
+                        <AnimatePresence>
+                            {isAvatarMenuOpen && (
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                                    className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border z-20"
+                                >
+                                    <div className="px-4 py-3 border-b">
+                                        <p className="text-sm font-semibold text-gray-800">{state.profile?.fullName || 'Utilisateur'}</p>
+                                        <p className="text-xs text-gray-500 truncate">{state.session?.user?.email}</p>
+                                        {subscriptionDetails && <p className="text-xs font-semibold text-blue-600 mt-1">{subscriptionDetails}</p>}
+                                    </div>
+                                    <div className="p-1">
+                                        {menuItems.map((item) => (
+                                            <button 
+                                                key={item.title}
+                                                onClick={() => handleNavigate(item.path)}
+                                                className={`w-full text-left flex items-center gap-3 px-3 py-2 text-sm rounded-md ${
+                                                    item.isDestructive 
+                                                    ? 'text-red-600 hover:bg-red-50' 
+                                                    : 'text-gray-700 hover:bg-gray-100'
+                                                }`}
+                                            >
+                                                <item.icon className="w-4 h-4" />
+                                                <span>{item.title}</span>
+                                            </button>
+                                        ))}
+                                        <div className="h-px bg-gray-200 my-1 mx-1"></div>
+                                        <button 
+                                            onClick={handleLogout}
+                                            className="w-full text-left flex items-center gap-3 px-3 py-2 text-sm text-red-600 rounded-md hover:bg-red-50"
+                                        >
+                                            <LogOut className="w-4 h-4" />
+                                            <span>Se déconnecter</span>
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
                   </div>
                   <button
                       onClick={handleFocusClick}

@@ -13,7 +13,7 @@ const ProfilePage = () => {
 
     useEffect(() => {
         if (profile) {
-            setFullName(profile.full_name || 'Levy');
+            setFullName(profile.fullName || 'Levy');
         }
         if (session?.user) {
             setEmail(session.user.email);
@@ -24,16 +24,35 @@ const ProfilePage = () => {
         e.preventDefault();
         setLoading(true);
 
-        const { data, error } = await supabase.auth.updateUser({
-            data: { full_name: fullName }
-        });
+        const { data: updatedProfile, error: profileError } = await supabase
+            .from('profiles')
+            .update({ full_name: fullName })
+            .eq('id', session.user.id)
+            .select('id, full_name, subscription_status, trial_ends_at, plan_id')
+            .single();
 
-        if (error) {
-            dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
-        } else {
-            dispatch({ type: 'SET_PROFILE', payload: { ...profile, full_name: data.user.user_metadata.full_name } });
-            dispatch({ type: 'ADD_TOAST', payload: { message: 'Profil mis à jour avec succès.', type: 'success' } });
+        if (profileError) {
+            dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${profileError.message}`, type: 'error' } });
+            setLoading(false);
+            return;
         }
+
+        // Also update auth metadata for consistency
+        await supabase.auth.updateUser({ data: { full_name: fullName } });
+
+        // Update local state with the full, fresh profile object
+        dispatch({ 
+            type: 'SET_PROFILE', 
+            payload: {
+                id: updatedProfile.id,
+                fullName: updatedProfile.full_name,
+                subscriptionStatus: updatedProfile.subscription_status,
+                trialEndsAt: updatedProfile.trial_ends_at,
+                planId: updatedProfile.plan_id,
+            } 
+        });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Profil mis à jour avec succès.', type: 'success' } });
+        
         setLoading(false);
     };
 

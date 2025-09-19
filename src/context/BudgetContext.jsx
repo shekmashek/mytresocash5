@@ -894,7 +894,7 @@ export const BudgetProvider = ({ children }) => {
           
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
-            .select('id, full_name, subscription_status, trial_ends_at, currency, display_unit, decimal_places, language, timezone_offset')
+            .select('id, full_name, subscription_status, trial_ends_at, plan_id, currency, display_unit, decimal_places, language, timezone_offset')
             .eq('id', user.id)
             .single();
 
@@ -905,6 +905,7 @@ export const BudgetProvider = ({ children }) => {
             fullName: profileData.full_name,
             subscriptionStatus: profileData.subscription_status,
             trialEndsAt: profileData.trial_ends_at,
+            planId: profileData.plan_id,
           } : null;
 
           if (!profile) {

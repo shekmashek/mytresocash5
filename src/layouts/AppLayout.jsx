@@ -46,7 +46,7 @@ const AppLayout = () => {
         }
         const cashAccounts = state.allCashAccounts[activeProjectId] || [];
         saveEntry(dispatch, { 
-            entryData: { ...entryData, user_id: user.id }, 
+            entryData, 
             editingEntry, 
             activeProjectId, 
             tiers: state.tiers,

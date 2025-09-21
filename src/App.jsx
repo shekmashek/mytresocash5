@@ -82,6 +82,7 @@ const ToastContainer = () => {
 // --- Protected Route Wrapper ---
 const ProtectedRoute = ({ children }) => {
   const { state } = useBudget();
+  const location = useLocation();
   const { session, isOnboarding, projects } = state;
 
   if (!session) {

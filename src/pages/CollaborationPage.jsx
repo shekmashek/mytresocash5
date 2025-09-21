@@ -6,7 +6,7 @@ import EmptyState from '../components/EmptyState';
 
 const CollaborationPage = () => {
     const { state, dispatch } = useBudget();
-    const { activeProjectId, projects } = state;
+    const { activeProjectId, projects, session } = state;
     const [collaborators, setCollaborators] = useState([]);
     const [email, setEmail] = useState('');
     const [role, setRole] = useState('viewer');
@@ -15,6 +15,14 @@ const CollaborationPage = () => {
 
     const activeProject = useMemo(() => projects.find(p => p.id === activeProjectId), [projects, activeProjectId]);
     const isConsolidated = !activeProject || activeProject.isConsolidated;
+    
+    // Determine if the current user is the owner of the selected project
+    const isOwner = useMemo(() => {
+        if (isConsolidated || !activeProject) return false;
+        const projectData = projects.find(p => p.id === activeProject.id);
+        return projectData?.user_id === session.user.id;
+    }, [activeProject, projects, session, isConsolidated]);
+
 
     const fetchCollaborators = async () => {
         if (isConsolidated || !activeProjectId) {
@@ -27,7 +35,7 @@ const CollaborationPage = () => {
             .select(`
                 id,
                 role,
-                user:users(id, email, raw_user_meta_data)
+                profiles(id, full_name, email)
             `)
             .eq('project_id', activeProjectId);
 
@@ -37,8 +45,8 @@ const CollaborationPage = () => {
             setCollaborators(data.map(c => ({
                 id: c.id,
                 role: c.role,
-                email: c.user.email,
-                name: c.user.raw_user_meta_data?.full_name || c.user.email.split('@')[0],
+                email: c.profiles.email,
+                name: c.profiles.full_name || c.profiles.email.split('@')[0],
             })));
         }
         setLoading(false);
@@ -50,11 +58,18 @@ const CollaborationPage = () => {
 
     const handleInvite = async (e) => {
         e.preventDefault();
+        if (!isOwner) {
+            dispatch({ type: 'ADD_TOAST', payload: { message: "Seul le propriétaire du projet peut inviter des collaborateurs.", type: 'error' } });
+            return;
+        }
         setInviting(true);
         try {
             const { data: invitedUser, error: userError } = await supabase.rpc('get_user_id_from_email', { p_email: email });
             if (userError || !invitedUser) {
                 throw new Error("L'utilisateur avec cet e-mail n'existe pas dans Trezocash.");
+            }
+            if (invitedUser === session.user.id) {
+                throw new Error("Vous ne pouvez pas vous inviter vous-même.");
             }
 
             const { error: inviteError } = await supabase
@@ -63,7 +78,7 @@ const CollaborationPage = () => {
                     project_id: activeProjectId,
                     user_id: invitedUser,
                     role: role,
-                    invited_by: state.session.user.id
+                    invited_by: session.user.id
                 });
             
             if (inviteError) throw inviteError;
@@ -109,6 +124,20 @@ const CollaborationPage = () => {
             </div>
         );
     }
+    
+    if (!isOwner) {
+        return (
+            <div className="container mx-auto p-6 max-w-4xl">
+                <div className="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-lg flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                    <div>
+                        <h4 className="font-bold">Accès Partagé</h4>
+                        <p className="text-sm">Vous consultez un projet qui a été partagé avec vous. Seul le propriétaire peut gérer les collaborateurs.</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="container mx-auto p-6 max-w-4xl">
@@ -131,7 +160,7 @@ const CollaborationPage = () => {
                         <label className="block text-sm font-medium text-gray-700 mb-1">Rôle</label>
                         <select value={role} onChange={e => setRole(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-white">
                             <option value="viewer">Lecteur</option>
-                            <option value="editor">Éditeur (Délégation)</option>
+                            <option value="editor">Éditeur</option>
                         </select>
                     </div>
                     <button type="submit" disabled={inviting} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 disabled:bg-gray-400">

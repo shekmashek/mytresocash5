@@ -6,36 +6,47 @@ export const useTreasuryData = () => {
     const { state } = useBudget();
     const { 
         projects, categories, settings, allCashAccounts, allEntries, allActuals, 
-        activeProjectId, timeUnit, horizonLength, periodOffset, activeQuickSelect 
+        activeProjectId, timeUnit, horizonLength, periodOffset, activeQuickSelect, consolidatedViews
     } = state;
 
-    const isConsolidated = useMemo(() => {
-        if (!activeProjectId) return true; // Default to consolidated if no project is active
-        return state.consolidatedViews.some(v => v.id === activeProjectId);
-    }, [activeProjectId, state.consolidatedViews]);
+    const { isConsolidated, activeProject, budgetEntries, actualTransactions, userCashAccounts } = useMemo(() => {
+        const isConsolidatedView = !activeProjectId || consolidatedViews.some(v => v.id === activeProjectId);
 
-    const { activeProject, budgetEntries, actualTransactions } = useMemo(() => {
-        if (isConsolidated) {
-            const activeProjectIds = state.consolidatedViews.find(v => v.id === activeProjectId)?.projectIds || projects.filter(p => !p.isArchived).map(p => p.id);
+        if (isConsolidatedView) {
+            const activeView = consolidatedViews.find(v => v.id === activeProjectId);
+            const activeProjectIds = activeView?.projectIds || projects.filter(p => !p.isArchived).map(p => p.id);
+            
+            const relevantEntries = Object.entries(allEntries)
+                .filter(([projectId]) => activeProjectIds.includes(projectId))
+                .flatMap(([projectId, entries]) => entries.map(entry => ({ ...entry, projectId })));
+
+            const relevantActuals = Object.entries(allActuals)
+                .filter(([projectId]) => activeProjectIds.includes(projectId))
+                .flatMap(([projectId, actuals]) => actuals.map(actual => ({ ...actual, projectId })));
+
+            const relevantAccounts = Object.entries(allCashAccounts)
+                .filter(([projectId]) => activeProjectIds.includes(projectId))
+                .flatMap(([, accounts]) => accounts);
+
             return {
-                activeProject: { id: activeProjectId, name: state.consolidatedViews.find(v => v.id === activeProjectId)?.name || 'Mes projets consolidé' },
-                budgetEntries: Object.entries(allEntries)
-                    .filter(([projectId]) => activeProjectIds.includes(projectId))
-                    .flatMap(([, entries]) => entries.map(entry => ({ ...entry, projectId: entry.project_id }))),
-                actualTransactions: Object.entries(allActuals)
-                    .filter(([projectId]) => activeProjectIds.includes(projectId))
-                    .flatMap(([, actuals]) => actuals.map(actual => ({ ...actual, projectId: actual.project_id }))),
+                isConsolidated: true,
+                activeProject: { id: activeProjectId, name: activeView?.name || 'Mes projets consolidé' },
+                budgetEntries: relevantEntries,
+                actualTransactions: relevantActuals,
+                userCashAccounts: relevantAccounts,
             };
         } else {
             const project = projects.find(p => p.id === activeProjectId);
             return {
+                isConsolidated: false,
                 activeProject: project,
                 budgetEntries: project ? (allEntries[project.id] || []) : [],
                 actualTransactions: project ? (allActuals[project.id] || []) : [],
+                userCashAccounts: project ? (allCashAccounts[project.id] || []) : [],
             };
         }
-    }, [activeProjectId, projects, allEntries, allActuals, isConsolidated, state.consolidatedViews]);
-
+    }, [activeProjectId, projects, allEntries, allActuals, allCashAccounts, consolidatedViews]);
+    
     const periods = useMemo(() => {
         const today = getTodayInTimezone(settings.timezoneOffset);
         let baseDate;
@@ -119,7 +130,6 @@ export const useTreasuryData = () => {
     const periodPositions = useMemo(() => {
         if (periods.length === 0) return [];
         
-        const userCashAccounts = isConsolidated ? Object.values(allCashAccounts).flat() : allCashAccounts[activeProjectId] || [];
         const hasOffBudgetRevenues = budgetEntries.some(e => e.isOffBudget && e.type === 'revenu' && isRowVisibleInPeriods(e));
         const hasOffBudgetExpenses = budgetEntries.some(e => e.isOffBudget && e.type === 'depense' && isRowVisibleInPeriods(e));
     
@@ -210,13 +220,14 @@ export const useTreasuryData = () => {
             }
         }
         return positions;
-    }, [periods, allCashAccounts, activeProjectId, isConsolidated, actualTransactions, groupedData, settings.timezoneOffset, budgetEntries]);
+    }, [periods, userCashAccounts, actualTransactions, groupedData, settings.timezoneOffset, budgetEntries]);
 
     return {
         isConsolidated,
         activeProject,
         budgetEntries,
         actualTransactions,
+        userCashAccounts,
         periods,
         groupedData,
         periodPositions,

@@ -11,19 +11,19 @@ const tourSteps = [
     position: 'bottom'
   },
   {
-    target: '#tour-step-budget',
+    target: '#tour-step-trezo',
     title: 'Le Tableau de Trésorerie',
     content: 'Votre centre de contrôle. Ici, vous avez une vision claire et détaillée de tous vos flux, période par période.',
     position: 'bottom'
   },
   {
-    target: '#tour-step-cashflow',
+    target: '#tour-step-flux',
     title: 'Le Suivi des Flux',
     content: 'Visualisez vos flux. Ce graphique vous permet de comprendre en un clin d\'œil d\'où vient et où va votre argent.',
     position: 'bottom'
   },
   {
-    target: '#tour-step-schedule',
+    target: '#tour-step-echeancier',
     title: 'L\'Échéancier',
     content: 'Ne manquez plus jamais une échéance. L\'échéancier vous présente toutes vos transactions à venir sous forme de calendrier.',
     position: 'bottom'
@@ -35,7 +35,7 @@ const tourSteps = [
     position: 'bottom'
   },
   {
-    target: '#tour-step-expenseAnalysis',
+    target: '#tour-step-analyse',
     title: 'L\'Analyse Approfondie',
     content: 'Plongez dans vos données. Analysez la répartition de vos dépenses et revenus pour prendre les meilleures décisions.',
     position: 'bottom'
@@ -63,7 +63,14 @@ const GuidedTour = () => {
       targetElement.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
       dispatch({ type: 'SET_TOUR_HIGHLIGHT', payload: step.target });
     } else {
-      handleNext();
+      // If target is not found, try to advance to the next step
+      // This can happen if a view is not rendered, etc.
+      // To prevent infinite loops, we add a check.
+      if (currentStep < tourSteps.length - 1) {
+        setCurrentStep(currentStep + 1);
+      } else {
+        endTour();
+      }
     }
   }, [currentStep, step.target, dispatch]);
 

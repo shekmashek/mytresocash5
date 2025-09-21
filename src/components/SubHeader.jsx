@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useBudget } from '../context/BudgetContext';
 import { supabase } from '../utils/supabase';
-import { Save, User, Shield, CreditCard, FileText, HelpCircle, LogOut, Table, ArrowDownUp, HandCoins, PieChart, Layers, BookOpen, Cog, Users, FolderKanban, Wallet, Archive, Clock, FolderCog, Globe, Target, Calendar, Plus, FilePlus, Banknote, Maximize, AreaChart, Receipt, Hash, LayoutDashboard, Trash2, Eye } from 'lucide-react';
+import { Save, User, Shield, CreditCard, FileText, HelpCircle, LogOut, Table, ArrowDownUp, HandCoins, PieChart, Layers, BookOpen, Cog, Users, FolderKanban, Wallet, Archive, Clock, FolderCog, Globe, Target, Calendar, Plus, FilePlus, Banknote, Maximize, AreaChart, Receipt, Hash, Eye, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from '../utils/i18n';
 import ProjectSwitcher from './ProjectSwitcher';
@@ -27,7 +27,7 @@ const SettingsLink = ({ item, onClick }) => {
   );
 };
 
-const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isConsolidated }) => {
+const SubHeader = ({ onNewBudgetEntry, onNewScenario, isConsolidated }) => {
   const { state, dispatch } = useBudget();
   const { settings, isTourActive, tourHighlightId, profile, session } = state;
   const { t, lang } = useTranslation();
@@ -89,6 +89,7 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
     { title: 'Mon profil', icon: User, path: '/app/profil' },
     { title: 'Mot de passe et sécurité', icon: Shield, path: '/app/securite' },
     { title: 'Mon abonnement', icon: CreditCard, path: '/app/abonnement' },
+    { title: 'Parrainage', icon: Users, path: '/app/parrainage' },
     { title: 'Factures', icon: FileText, path: '/app/factures' },
     { title: 'Supprimer mon compte', icon: Trash2, path: '/app/delete-account', isDestructive: true },
     { title: 'Centre d\'aide', icon: HelpCircle, path: '/app/aide' },
@@ -105,6 +106,7 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
     { id: 'categoryManagement', label: t('advancedSettings.categories'), icon: FolderKanban, color: 'text-orange-500' },
     { id: 'tiersManagement', label: t('advancedSettings.tiers'), icon: Users, color: 'text-pink-500' },
     { id: 'cashAccounts', label: t('advancedSettings.accounts'), icon: Wallet, color: 'text-teal-500' },
+    { id: '/app/collaborateurs', label: 'Collaborateurs', icon: Users, color: 'text-purple-500' },
     { id: 'timezoneSettings', label: 'Fuseau Horaire', icon: Globe, color: 'text-cyan-500' },
     { id: 'archives', label: t('advancedSettings.archives'), icon: Archive, color: 'text-secondary-500' },
   ];
@@ -115,7 +117,7 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
     { label: 'Sortie payée', icon: Banknote, action: () => dispatch({ type: 'OPEN_DIRECT_PAYMENT_MODAL', payload: 'payable' }), disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Payer directement des sorties" },
     { label: 'Scénario', icon: Layers, action: onNewScenario, disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Créer une nouvelle simulation financière" },
     { label: 'Nouvelle Note', icon: FileText, action: () => dispatch({ type: 'ADD_NOTE' }), disabled: false, tooltip: "Ajouter une note épinglée sur l'écran" },
-    { label: 'Compte de liquidité', icon: Wallet, action: () => onOpenSettingsDrawer('cashAccounts'), disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Ajouter un nouveau compte bancaire, caisse, etc." }
+    { label: 'Compte de liquidité', icon: Wallet, action: () => dispatch({ type: 'SET_ACTIVE_SETTINGS_DRAWER', payload: 'cashAccounts' }), disabled: isConsolidated, tooltip: isConsolidated ? "Non disponible en vue consolidée" : "Ajouter un nouveau compte bancaire, caisse, etc." }
   ];
 
   const handleSettingsItemClick = (itemId) => {
@@ -140,12 +142,12 @@ const SubHeader = ({ onOpenSettingsDrawer, onNewBudgetEntry, onNewScenario, isCo
 
   const subscriptionDetails = useMemo(() => {
     if (!profile) return null;
-    const status = profile.subscriptionStatus;
+    const status = profile.subscription_status;
     if (status === 'lifetime') return 'Statut : Accès à Vie';
     if (status === 'active') {
         return 'Statut : Abonnement Pro';
     }
-    const trialEndDate = profile.trialEndsAt ? new Date(profile.trialEndsAt) :
+    const trialEndDate = profile.trial_ends_at ? new Date(profile.trial_ends_at) :
                          session?.user?.created_at ? new Date(new Date(session.user.created_at).setDate(new Date(session.user.created_at).getDate() + 14)) : null;
     if (trialEndDate) {
         const daysLeft = Math.max(0, Math.ceil((trialEndDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)));

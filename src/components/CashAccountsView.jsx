@@ -4,10 +4,11 @@ import { formatCurrency } from '../utils/formatting';
 import { useBudget, mainCashAccountCategories } from '../context/BudgetContext';
 import AddAccountForm from './AddAccountForm';
 import EmptyState from './EmptyState';
+import { addUserCashAccount, updateUserCashAccount, deleteUserCashAccount, reopenCashAccount } from '../context/actions';
 
 const CashAccountsView = () => {
   const { state, dispatch } = useBudget();
-  const { allCashAccounts, settings, allActuals, activeProjectId, projects } = state;
+  const { allCashAccounts, settings, allActuals, activeProjectId, projects, session } = state;
   const activeProject = useMemo(() => projects.find(p => p.id === activeProjectId), [projects, activeProjectId]);
   const isConsolidated = activeProjectId === 'consolidated';
 
@@ -46,31 +47,26 @@ const CashAccountsView = () => {
       dispatch({ type: 'ADD_TOAST', payload: { message: "Le nom du compte ne peut pas être vide.", type: 'error' } });
       return;
     }
-    dispatch({
-      type: 'UPDATE_USER_CASH_ACCOUNT',
-      payload: {
-        projectId: activeProjectId,
-        accountId: editingAccount.id,
-        accountData: {
-          name: editingAccount.name.trim(),
-          initialBalance: parseFloat(editingAccount.initialBalance) || 0,
-          initialBalanceDate: editingAccount.initialBalanceDate
-        }
+    updateUserCashAccount(dispatch, {
+      projectId: activeProjectId,
+      accountId: editingAccount.id,
+      accountData: {
+        name: editingAccount.name.trim(),
+        initialBalance: parseFloat(editingAccount.initialBalance) || 0,
+        initialBalanceDate: editingAccount.initialBalanceDate
       }
     });
     handleCancelEdit();
   };
 
   const handleAddAccount = (formData) => {
-    dispatch({
-      type: 'ADD_USER_CASH_ACCOUNT',
-      payload: {
-        projectId: activeProjectId,
-        mainCategoryId: formData.mainCategoryId,
-        name: formData.name.trim(),
-        initialBalance: parseFloat(formData.initialBalance) || 0,
-        initialBalanceDate: formData.initialBalanceDate || new Date().toISOString().split('T')[0]
-      }
+    addUserCashAccount(dispatch, {
+      projectId: activeProjectId,
+      mainCategoryId: formData.mainCategoryId,
+      name: formData.name.trim(),
+      initialBalance: parseFloat(formData.initialBalance) || 0,
+      initialBalanceDate: formData.initialBalanceDate || new Date().toISOString().split('T')[0],
+      user: session.user
     });
     setIsAddingAccount(false);
   };
@@ -85,7 +81,7 @@ const CashAccountsView = () => {
       payload: {
         title: 'Supprimer ce compte ?',
         message: 'Cette action est irréversible.',
-        onConfirm: () => dispatch({ type: 'DELETE_USER_CASH_ACCOUNT', payload: { projectId: activeProjectId, accountId } }),
+        onConfirm: () => deleteUserCashAccount(dispatch, { projectId: activeProjectId, accountId }),
       }
     });
   };
@@ -95,7 +91,7 @@ const CashAccountsView = () => {
   };
 
   const handleReopen = (accountId) => {
-    dispatch({ type: 'REOPEN_CASH_ACCOUNT', payload: { projectId: activeProjectId, accountId } });
+    reopenCashAccount(dispatch, { projectId: activeProjectId, accountId });
   };
   
   if (isConsolidated) {

@@ -5,7 +5,7 @@ import { Menu, X } from 'lucide-react';
 import TrezocashLogo from '../components/TrezocashLogo';
 import FlagIcon from '../components/FlagIcon';
 
-const PublicLayout = ({ onLogin, onSignUp, children }) => {
+const PublicLayout = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
   const [lang, setLang] = useState('fr');
@@ -40,6 +40,11 @@ const PublicLayout = ({ onLogin, onSignUp, children }) => {
     } else {
       navigate(path);
     }
+    setIsMobileMenuOpen(false);
+  };
+
+  const handleAuthNav = (mode, fromTrial = false) => {
+    navigate('/auth', { state: { mode, fromTrial } });
     setIsMobileMenuOpen(false);
   };
 
@@ -98,10 +103,10 @@ const PublicLayout = ({ onLogin, onSignUp, children }) => {
             </nav>
 
             <div className="hidden md:flex items-center gap-4">
-              <button onClick={onLogin} className="text-sm font-semibold text-gray-600 hover:text-blue-600">
+              <button onClick={() => handleAuthNav('login')} className="text-sm font-semibold text-gray-600 hover:text-blue-600">
                 Se connecter
               </button>
-              <button onClick={onSignUp} className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
+              <button onClick={() => handleAuthNav('signup', true)} className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
                 Essai Gratuit
               </button>
             </div>
@@ -136,8 +141,8 @@ const PublicLayout = ({ onLogin, onSignUp, children }) => {
                 <button key={link.label} onClick={() => handleNavClick(link.path)} className="text-lg font-semibold text-gray-700">{link.label}</button>
               ))}
               <hr className="w-full my-4" />
-              <button onClick={onLogin} className="text-lg font-semibold text-gray-700">Se connecter</button>
-              <button onClick={onSignUp} className="w-full px-6 py-3 text-lg font-semibold text-white bg-blue-600 rounded-lg">Essai Gratuit</button>
+              <button onClick={() => handleAuthNav('login')} className="text-lg font-semibold text-gray-700">Se connecter</button>
+              <button onClick={() => handleAuthNav('signup', true)} className="w-full px-6 py-3 text-lg font-semibold text-white bg-blue-600 rounded-lg">Essai Gratuit</button>
             </nav>
           </motion.div>
         )}

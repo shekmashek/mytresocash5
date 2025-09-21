@@ -7,16 +7,9 @@ import { saveEntry, updateSettings, updateUserCashAccount } from '../context/act
 
 // --- Initial State Definition ---
 const getDefaultExpenseTargets = () => ({
-  'exp-main-1': 20, // Exploitation (le reste, calculé)
-  'exp-main-2': 35, // Masse Salariale
-  'exp-main-3': 10, // Investissement
-  'exp-main-4': 0,  // Financement
-  'exp-main-5': 10, // Épargne et Provision
-  'exp-main-6': 5,  // Exceptionnel
-  'exp-main-7': 10, // Impôts et Taxes
-  'exp-main-8': 5,  // Formation
-  'exp-main-9': 5,  // Innovation, Recherche et développement
-  'exp-main-10': 0, // Personnel
+  'exp-main-1': 20, 'exp-main-2': 35, 'exp-main-3': 10, 'exp-main-4': 0,
+  'exp-main-5': 10, 'exp-main-6': 5, 'exp-main-7': 10, 'exp-main-8': 5,
+  'exp-main-9': 5, 'exp-main-10': 0,
 });
 
 const createDefaultCashAccount = (projectId) => ({
@@ -65,7 +58,7 @@ const initialCategories = {
         { id: uuidv4(), name: "Remboursement d'emprunt" }, 
         { id: uuidv4(), name: "Intérêts d'emprunt" },
     ] },
-    { id: 'exp-main-5', name: 'Épargne et Provision', isFixed: true, subCategories: [
+    { id: 'exp-main-5', name: 'Épargne', isFixed: true, subCategories: [
         { id: uuidv4(), name: 'Provision pour risques' },
         { id: uuidv4(), name: "Fond d'urgence" },
         { id: uuidv4(), name: 'Epargne Projet à court et moyen termes' },
@@ -118,6 +111,17 @@ const initialCategories = {
         { id: uuidv4(), name: 'Etude et prestation de service' },
         { id: uuidv4(), name: 'Equipement et travaux' },
     ]},
+    {
+        id: 'exp-main-14',
+        name: 'Fonds provisionné',
+        isFixed: true,
+        subCategories: [
+            { id: uuidv4(), name: 'Fonds provisionné pour impots' },
+            { id: uuidv4(), name: 'Fonds provisionné pour dividente' },
+            { id: uuidv4(), name: 'Fonds provisionné pour investissement' },
+            { id: uuidv4(), name: 'Fonds provisionné pour etudes' },
+        ]
+    },
   ]
 };
 
@@ -138,13 +142,13 @@ export const mainCashAccountCategories = [
   { id: 'provisions', name: 'Provisions' },
 ];
 
-const CONSOLIDATED_PROJECT_ID = 'consolidated';
 const SCENARIO_COLORS = ['#8b5cf6', '#f97316', '#d946ef']; // violet, orange, fuchsia
 
 const getInitialState = () => ({
     session: null,
     profile: null,
     projects: [],
+    consolidatedViews: [],
     categories: initialCategories,
     allEntries: {},
     allActuals: {},
@@ -186,6 +190,8 @@ const getInitialState = () => ({
     focusView: 'none',
     isScenarioModalOpen: false,
     editingScenario: null,
+    isConsolidatedViewModalOpen: false,
+    editingConsolidatedView: null,
     isTourActive: false,
     tourHighlightId: null,
     isLoading: true,
@@ -205,14 +211,57 @@ const budgetReducer = (state, action) => {
       return { ...state, isLoading: action.payload };
     case 'RESET_STATE':
         return { ...getInitialState(), isLoading: false };
-    case 'SET_INITIAL_DATA':
+    case 'SET_INITIAL_DATA': {
+        const { projects, consolidatedViews } = action.payload;
+        const firstConsolidated = consolidatedViews && consolidatedViews[0];
+        const firstProject = projects && projects.filter(p => !p.isArchived)[0];
+        const defaultActiveId = firstConsolidated?.id || firstProject?.id || null;
+
         return {
             ...state,
             ...action.payload,
             isLoading: false,
-            isOnboarding: action.payload.projects.length === 0,
-            activeProjectId: state.activeProjectId || (action.payload.projects.length > 0 ? 'consolidated' : null),
+            isOnboarding: projects.length === 0,
+            activeProjectId: state.activeProjectId || defaultActiveId,
         };
+    }
+    case 'OPEN_CONSOLIDATED_VIEW_MODAL':
+      return { ...state, isConsolidatedViewModalOpen: true, editingConsolidatedView: action.payload };
+    case 'CLOSE_CONSOLIDATED_VIEW_MODAL':
+      return { ...state, isConsolidatedViewModalOpen: false, editingConsolidatedView: null };
+    case 'ADD_CONSOLIDATED_VIEW_SUCCESS': {
+      const newView = {
+        id: action.payload.id,
+        name: action.payload.name,
+        description: action.payload.description,
+        projectIds: action.payload.project_ids,
+        isConsolidated: true,
+      };
+      return { ...state, consolidatedViews: [...state.consolidatedViews, newView] };
+    }
+    case 'UPDATE_CONSOLIDATED_VIEW_SUCCESS': {
+      const updatedViewData = action.payload;
+      const updatedView = {
+        id: updatedViewData.id,
+        name: updatedViewData.name,
+        description: updatedViewData.description,
+        projectIds: updatedViewData.project_ids,
+        isConsolidated: true,
+      };
+      return {
+        ...state,
+        consolidatedViews: state.consolidatedViews.map(v => v.id === updatedView.id ? updatedView : v),
+      };
+    }
+    case 'DELETE_CONSOLIDATED_VIEW_SUCCESS': {
+      const viewId = action.payload;
+      const firstProject = state.projects.filter(p => !p.isArchived)[0];
+      return {
+        ...state,
+        consolidatedViews: state.consolidatedViews.filter(v => v.id !== viewId),
+        activeProjectId: state.activeProjectId === viewId ? (firstProject?.id || null) : state.activeProjectId,
+      };
+    }
     case 'OPEN_TRANSACTION_ACTION_MENU':
       return { ...state, transactionMenu: { isOpen: true, ...action.payload } };
     case 'CLOSE_TRANSACTION_ACTION_MENU':
@@ -576,7 +625,7 @@ const budgetReducer = (state, action) => {
       return {
         ...state,
         projects: state.projects.map(p => p.id === projectId ? { ...p, isArchived: true } : p),
-        activeProjectId: state.activeProjectId === projectId ? CONSOLIDATED_PROJECT_ID : state.activeProjectId,
+        activeProjectId: state.activeProjectId === projectId ? 'consolidated' : state.activeProjectId,
       };
     }
     case 'DELETE_PROJECT_SUCCESS': {
@@ -600,7 +649,7 @@ const budgetReducer = (state, action) => {
       if (remainingProjects.length === 0) {
           newActiveProjectId = null;
       } else if (state.activeProjectId === projectId) {
-          newActiveProjectId = CONSOLIDATED_PROJECT_ID;
+          newActiveProjectId = 'consolidated';
       }
 
       return {
@@ -777,7 +826,7 @@ const budgetReducer = (state, action) => {
     }
     case 'DELETE_ENTRY_SUCCESS': {
         const { entryId, entryProjectId } = action.payload;
-        if (!entryProjectId || entryProjectId === CONSOLIDATED_PROJECT_ID) return state;
+        if (!entryProjectId) return state;
 
         const newAllEntries = { ...state.allEntries };
         newAllEntries[entryProjectId] = (newAllEntries[entryProjectId] || []).filter(e => e.id !== entryId);
@@ -911,7 +960,7 @@ export const BudgetProvider = ({ children }) => {
           if (!profile) {
              console.warn("Profile not found for user, might be a new user.");
              dispatch({ type: 'SET_LOADING', payload: false });
-             dispatch({ type: 'SET_INITIAL_DATA', payload: { profile: null, projects: [], settings: initialSettings, allEntries: {}, allActuals: {}, allCashAccounts: {}, tiers: [], notes: [], loans: [], scenarios: [], scenarioEntries: {} } });
+             dispatch({ type: 'SET_INITIAL_DATA', payload: { profile: null, projects: [], settings: initialSettings, allEntries: {}, allActuals: {}, allCashAccounts: {}, tiers: [], notes: [], loans: [], scenarios: [], scenarioEntries: {}, consolidatedViews: [] } });
              return;
           }
 
@@ -923,30 +972,42 @@ export const BudgetProvider = ({ children }) => {
             timezoneOffset: profileData.timezone_offset ?? 0,
           };
 
+          const { data: accessibleProjects, error: accessibleProjectsError } = await supabase.rpc('get_user_accessible_projects');
+          if (accessibleProjectsError) throw accessibleProjectsError;
+          
+          const projectIds = accessibleProjects.map(p => p.project_id);
+
+          if (projectIds.length === 0) {
+              dispatch({ type: 'SET_INITIAL_DATA', payload: { profile, settings, projects: [], allEntries: {}, allActuals: {}, allCashAccounts: {}, tiers: [], notes: [], loans: [], scenarios: [], scenarioEntries: {}, consolidatedViews: [] } });
+              return;
+          }
+
           const [
             projectsRes, tiersRes, notesRes, loansRes, scenariosRes, 
-            entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes
+            entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes,
+            consolidatedViewsRes
           ] = await Promise.all([
-            supabase.from('projects').select('*'),
+            supabase.from('projects').select('*').in('id', projectIds),
             supabase.from('tiers').select('*'),
             supabase.from('notes').select('*'),
-            supabase.from('loans').select('*'),
-            supabase.from('scenarios').select('*'),
-            supabase.from('budget_entries').select('*'),
-            supabase.from('actual_transactions').select('*'),
+            supabase.from('loans').select('*').in('project_id', projectIds),
+            supabase.from('scenarios').select('*').in('project_id', projectIds),
+            supabase.from('budget_entries').select('*').in('project_id', projectIds),
+            supabase.from('actual_transactions').select('*').in('project_id', projectIds),
             supabase.from('payments').select('*'),
-            supabase.from('cash_accounts').select('*'),
+            supabase.from('cash_accounts').select('*').in('project_id', projectIds),
             supabase.from('scenario_entries').select('*'),
+            supabase.from('consolidated_views').select('*'),
           ]);
 
-          const responses = { projectsRes, tiersRes, notesRes, loansRes, scenariosRes, entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes };
+          const responses = { projectsRes, tiersRes, notesRes, loansRes, scenariosRes, entriesRes, actualsRes, paymentsRes, cashAccountsRes, scenarioEntriesRes, consolidatedViewsRes };
           for (const key in responses) {
             if (responses[key].error) throw responses[key].error;
           }
 
           const projects = (projectsRes.data || []).map(p => ({
             id: p.id, name: p.name, currency: p.currency, startDate: p.start_date, isArchived: p.is_archived,
-            annualGoals: p.annual_goals, expenseTargets: p.expense_targets
+            annualGoals: p.annual_goals, expenseTargets: p.expense_targets, isOwner: p.user_id === user.id
           }));
           
           const tiers = (tiersRes.data || []).map(t => ({ id: t.id, name: t.name, type: t.type }));
@@ -957,6 +1018,13 @@ export const BudgetProvider = ({ children }) => {
           }));
           const scenarios = (scenariosRes.data || []).map(s => ({
             id: s.id, projectId: s.project_id, name: s.name, description: s.description, color: s.color, isVisible: s.is_visible, isArchived: s.is_archived
+          }));
+          const consolidatedViews = (consolidatedViewsRes.data || []).map(v => ({
+            id: v.id,
+            name: v.name,
+            description: v.description,
+            projectIds: v.project_ids,
+            isConsolidated: true,
           }));
 
           const allEntries = (entriesRes.data || []).reduce((acc, entry) => {
@@ -1016,7 +1084,7 @@ export const BudgetProvider = ({ children }) => {
             payload: {
               profile,
               settings,
-              projects, tiers, notes, loans, scenarios,
+              projects, tiers, notes, loans, scenarios, consolidatedViews,
               allEntries, allActuals, allCashAccounts, scenarioEntries,
             },
           });

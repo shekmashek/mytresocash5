@@ -7,16 +7,19 @@ import { getTodayInTimezone } from '../utils/budgetCalculations';
 import TrezocashLogo from './TrezocashLogo';
 import ActionableBalanceDrawer from './ActionableBalanceDrawer';
 import SparklineChart from './SparklineChart';
+import { useTreasuryData } from '../hooks/useTreasuryData';
 
-const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => {
+const Header = ({ isCollapsed, onToggleCollapse }) => {
   const { state, dispatch } = useBudget();
-  const { settings, activeProjectId, allCashAccounts, allActuals, allEntries, loans, currentView } = state;
+  const { settings, activeProjectId, allCashAccounts, allActuals, allEntries, loans, projects } = state;
+
+  const { periods, periodPositions } = useTreasuryData();
 
   const [isBalanceDrawerOpen, setIsBalanceDrawerOpen] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState(null);
   const [collapsedSections, setCollapsedSections] = useState({
-    balances: true,
-    overdue: true,
+    balances: false,
+    overdue: false,
     loans: true,
   });
 
@@ -24,16 +27,19 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
     setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
-  const isConsolidated = activeProjectId === 'consolidated';
+  const isConsolidated = useMemo(() => {
+    if (!activeProjectId) return true;
+    return state.consolidatedViews.some(v => v.id === activeProjectId);
+  }, [activeProjectId, state.consolidatedViews]);
 
-  const handleNavigate = (view) => {
-    dispatch({ type: 'SET_CURRENT_VIEW', payload: view });
+  const handleNavigate = (path) => {
+    dispatch({ type: 'NAVIGATE', payload: path });
   };
 
   const handleOverdueClick = (type) => {
     const view = type === 'payable' ? 'payables' : 'receivables';
     dispatch({ type: 'SET_ACTUALS_VIEW_FILTER', payload: { status: 'overdue' } });
-    dispatch({ type: 'SET_CURRENT_VIEW', payload: view });
+    handleNavigate(`/app/${view}`);
   };
 
   const headerMetrics = useMemo(() => {
@@ -47,7 +53,6 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
 
     let totalActionableCash = 0;
     let totalSavings = 0;
-    let totalProvisions = 0;
 
     relevantAccounts.forEach(account => {
         let currentBalance = parseFloat(account.initialBalance) || 0;
@@ -72,13 +77,13 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
 
         const actionableBalance = currentBalance - blockedForProvision;
         totalActionableCash += actionableBalance;
-        if (account.mainCategoryId === 'savings') {
-            totalSavings += currentBalance;
-        }
-        if (account.mainCategoryId === 'provisions') {
-            totalProvisions += currentBalance;
-        }
     });
+
+    const savingsEntries = (isConsolidated ? Object.values(allEntries).flat() : (allEntries[activeProjectId] || []))
+        .filter(e => e.category.toLowerCase().includes('épargne'));
+
+    const savingsActuals = relevantActuals.filter(a => savingsEntries.some(e => e.id === a.budgetId));
+    totalSavings = savingsActuals.reduce((sum, actual) => sum + (actual.payments || []).reduce((pSum, p) => pSum + p.paidAmount, 0), 0);
 
     const today = getTodayInTimezone(settings.timezoneOffset);
     const unpaidStatuses = ['pending', 'partially_paid', 'partially_received'];
@@ -146,13 +151,12 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
     return {
         actionableCash: formatCurrency(totalActionableCash, settings),
         savings: formatCurrency(totalSavings, settings),
-        provisions: formatCurrency(totalProvisions, settings),
         overduePayables: formatCurrency(totalOverduePayables, settings),
         overdueReceivables: formatCurrency(totalOverdueReceivables, settings),
         totalDebts: formatCurrency(totalBorrowingPrincipalRemaining, settings),
         totalCredits: formatCurrency(totalLoanPrincipalRemaining, settings),
     };
-  }, [activeProjectId, allCashAccounts, allActuals, settings, loans, allEntries, isConsolidated]);
+  }, [activeProjectId, allCashAccounts, allActuals, settings, loans, allEntries, isConsolidated, projects]);
 
   const userCashAccounts = useMemo(() => {
     if (isConsolidated) {
@@ -168,6 +172,7 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
   }, [activeProjectId, allActuals, isConsolidated]);
 
   const accountBalances = useMemo(() => {
+    if (!userCashAccounts) return [];
     return userCashAccounts.map(account => {
       let currentBalance = parseFloat(account.initialBalance) || 0;
       const accountPayments = relevantActuals
@@ -269,13 +274,6 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
                                   <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.savings}</span>
                               </div>
                           </div>
-                          <div className="flex items-center gap-2" title="Total Provisions">
-                              <Lock className="w-5 h-5 shrink-0 text-gray-500" />
-                              <div className="flex justify-between items-center w-full">
-                                  <span className="font-medium text-sm text-text-secondary">Provision</span>
-                                  <span className="font-normal text-xs truncate text-gray-500">{headerMetrics.provisions}</span>
-                              </div>
-                          </div>
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -318,7 +316,7 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
                     <AnimatePresence>
                       {!collapsedSections.loans && (
                         <motion.div initial="collapsed" animate="open" exit="collapsed" variants={motionVariants} transition={{ duration: 0.3, ease: "easeInOut" }} className="overflow-hidden pl-2 space-y-2">
-                          <button onClick={() => handleNavigate('borrowings')} className={`w-full text-left rounded-lg transition-colors ${currentView === 'borrowings' ? 'bg-secondary-100' : 'hover:bg-secondary-100'}`}>
+                          <button onClick={() => handleNavigate('/app/borrowings')} className={`w-full text-left rounded-lg transition-colors hover:bg-secondary-100`}>
                             <div className="flex items-center gap-2" title="Gérer vos emprunts">
                                 <Banknote className="w-5 h-5 shrink-0 text-gray-500" />
                                 <div className="flex justify-between items-center w-full">
@@ -327,7 +325,7 @@ const Header = ({ isCollapsed, onToggleCollapse, periodPositions, periods }) => 
                                 </div>
                             </div>
                           </button>
-                          <button onClick={() => handleNavigate('loans')} className={`w-full text-left rounded-lg transition-colors ${currentView === 'loans' ? 'bg-secondary-100' : 'hover:bg-secondary-100'}`}>
+                          <button onClick={() => handleNavigate('/app/loans')} className={`w-full text-left rounded-lg transition-colors hover:bg-secondary-100`}>
                             <div className="flex items-center gap-2" title="Gérer vos prêts">
                                 <Coins className="w-5 h-5 shrink-0 text-gray-500" />
                                 <div className="flex justify-between items-center w-full">

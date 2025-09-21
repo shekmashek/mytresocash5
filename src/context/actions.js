@@ -1,132 +1,32 @@
 import { supabase } from '../utils/supabase';
 import { deriveActualsFromEntry } from '../utils/scenarioCalculations';
 
-const getDefaultExpenseTargets = () => ({
-  'exp-main-1': 20, 'exp-main-2': 35, 'exp-main-3': 10, 'exp-main-4': 0,
-  'exp-main-5': 10, 'exp-main-6': 5, 'exp-main-7': 10, 'exp-main-8': 5,
-  'exp-main-9': 5, 'exp-main-10': 0,
-});
-
-const addMonths = (date, months) => {
-  const d = new Date(date);
-  const day = d.getDate();
-  d.setMonth(d.getMonth() + months);
-  if (d.getDate() !== day) {
-    d.setDate(0);
-  }
-  return d;
-};
-
-export const initializeProject = async (dispatch, payload, user, existingTiersData, currency) => {
+export const initializeProject = async (dispatch, payload, user, currency) => {
   try {
-    const { projectName, projectStartDate, cashAccounts, entries, monthlyRevenue, monthlyExpense, loans, borrowings } = payload;
+    const { projectName, projectStartDate } = payload;
     
-    // 1. Create Project
+    const { data: newProjectId, error: rpcError } = await supabase.rpc('handle_new_project', {
+        project_name: projectName,
+        project_start_date: projectStartDate,
+        project_currency: currency
+    });
+
+    if (rpcError) throw rpcError;
+
+    // Fetch the newly created project and its default cash account to update the state
     const { data: newProjectData, error: projectError } = await supabase
         .from('projects')
-        .insert({
-            user_id: user.id, name: projectName, start_date: projectStartDate, currency: currency,
-            annual_goals: { [new Date().getFullYear()]: { revenue: (parseFloat(monthlyRevenue) || 0) * 12, expense: (parseFloat(monthlyExpense) || 0) * 12 } },
-            expense_targets: getDefaultExpenseTargets(),
-        })
-        .select().single();
+        .select('*')
+        .eq('id', newProjectId)
+        .single();
     if (projectError) throw projectError;
 
-    // 2. Create Cash Accounts
     const { data: newCashAccountsData, error: cashAccountsError } = await supabase
         .from('cash_accounts')
-        .insert(cashAccounts.map(acc => ({
-            project_id: newProjectData.id, user_id: user.id, main_category_id: acc.mainCategoryId,
-            name: acc.name, initial_balance: acc.initialBalance, initial_balance_date: acc.initialBalanceDate,
-        })))
-        .select();
+        .select('*')
+        .eq('project_id', newProjectId);
     if (cashAccountsError) throw cashAccountsError;
-    
-    // 3. Handle Tiers
-    const existingTiers = new Set((existingTiersData || []).map(t => t.name.toLowerCase()));
-    const newTiersToCreate = new Set();
-    const allEntriesAndLoans = [...entries, ...loans, ...borrowings];
-    allEntriesAndLoans.forEach(item => {
-        const tierName = item.supplier || item.thirdParty;
-        if (tierName && !existingTiers.has(tierName.toLowerCase())) {
-            const type = item.type === 'revenu' || item.type === 'loan' ? 'client' : 'fournisseur';
-            newTiersToCreate.add(JSON.stringify({ name: tierName, type, user_id: user.id }));
-        }
-    });
-    let createdTiers = [];
-    if (newTiersToCreate.size > 0) {
-        const { data: insertedTiers, error: tiersError } = await supabase.from('tiers').upsert(Array.from(newTiersToCreate).map(t => JSON.parse(t)), { onConflict: 'user_id,name,type' }).select();
-        if (tiersError) throw tiersError;
-        createdTiers = insertedTiers;
-    }
 
-    // 4. Create Budget Entries
-    const { data: newEntriesData, error: entriesError } = await supabase
-        .from('budget_entries')
-        .insert(entries.map(entry => ({
-            project_id: newProjectData.id, user_id: user.id, type: entry.type, category: entry.category,
-            frequency: entry.frequency, amount: entry.amount, date: entry.date, start_date: entry.startDate,
-            supplier: entry.supplier, description: entry.description,
-        })))
-        .select();
-    if (entriesError) throw entriesError;
-
-    // 5. Create Actuals from entries
-    let newActualsToInsert = [];
-    newEntriesData.forEach(entry => {
-        const actuals = deriveActualsFromEntry(entry, newProjectData.id, newCashAccountsData);
-        newActualsToInsert.push(...actuals);
-    });
-
-    // 6. Loans and their entries/actuals
-    const allLoans = [...borrowings, ...loans];
-    let newLoans = [];
-    if (allLoans.length > 0) {
-        const loansToInsert = allLoans.map(l => ({
-            project_id: newProjectData.id, user_id: user.id, type: l.type, third_party: l.thirdParty,
-            principal: parseFloat(l.principal), monthly_payment: parseFloat(l.monthlyPayment), term: parseInt(l.term, 10),
-            principal_date: l.principalDate, repayment_start_date: l.repaymentStartDate,
-        }));
-        const { data: insertedLoans, error: loansError } = await supabase.from('loans').insert(loansToInsert).select();
-        if (loansError) throw loansError;
-        newLoans = insertedLoans;
-
-        const loanEntriesToInsert = [];
-        for (const loan of newLoans) {
-            loanEntriesToInsert.push({
-                project_id: loan.project_id, user_id: user.id, loan_id: loan.id, type: loan.type === 'borrowing' ? 'revenu' : 'depense',
-                category: loan.type === 'borrowing' ? 'Réception Emprunt' : 'Octroi de Prêt', frequency: 'ponctuel', amount: loan.principal,
-                date: loan.principal_date, supplier: loan.third_party, description: `Principal pour prêt/emprunt`
-            });
-            loanEntriesToInsert.push({
-                project_id: loan.project_id, user_id: user.id, loan_id: loan.id, type: loan.type === 'borrowing' ? 'depense' : 'revenu',
-                category: loan.type === 'borrowing' ? 'Remboursement d\'emprunt' : 'Remboursement de prêt reçu', frequency: 'mensuel',
-                amount: loan.monthly_payment, start_date: loan.repayment_start_date,
-                end_date: addMonths(new Date(loan.repayment_start_date), loan.term - 1).toISOString().split('T')[0],
-                supplier: loan.third_party, description: `Remboursement prêt/emprunt`
-            });
-        }
-        const { data: insertedLoanEntries, error: loanEntriesError } = await supabase.from('budget_entries').insert(loanEntriesToInsert).select();
-        if (loanEntriesError) throw loanEntriesError;
-
-        for (const entry of insertedLoanEntries) {
-            const actuals = deriveActualsFromEntry(entry, entry.project_id, newCashAccountsData);
-            newActualsToInsert.push(...actuals);
-        }
-    }
-
-    // Batch insert all actuals
-    if (newActualsToInsert.length > 0) {
-        const { error: actualsError } = await supabase.from('actual_transactions').insert(newActualsToInsert.map(a => ({
-            id: a.id, budget_id: a.budgetId, project_id: a.projectId, user_id: user.id, type: a.type,
-            category: a.category, third_party: a.thirdParty, description: a.description, date: a.date,
-            amount: a.amount, status: a.status, is_off_budget: a.isOffBudget, is_provision: a.isProvision,
-            is_final_provision_payment: a.isFinalProvisionPayment, provision_details: a.provisionDetails,
-            is_internal_transfer: a.isInternalTransfer,
-        })));
-        if (actualsError) throw actualsError;
-    }
-    
     dispatch({ 
         type: 'INITIALIZE_PROJECT_SUCCESS', 
         payload: {
@@ -138,23 +38,12 @@ export const initializeProject = async (dispatch, payload, user, existingTiersDa
             finalCashAccounts: newCashAccountsData.map(acc => ({
                 id: acc.id, projectId: acc.project_id, mainCategoryId: acc.main_category_id,
                 name: acc.name, initialBalance: acc.initial_balance, initialBalanceDate: acc.initial_balance_date,
-                isClosed: acc.is_closed, closureDate: acc.closure_date
+                isClosed: acc.is_closed, closureDate: acc.closure_date,
             })),
-            newAllEntries: newEntriesData.map(entry => ({
-              id: entry.id, loanId: entry.loan_id, type: entry.type, category: entry.category, frequency: entry.frequency,
-              amount: entry.amount, date: entry.date, startDate: entry.start_date, endDate: entry.end_date,
-              supplier: entry.supplier, description: entry.description, isOffBudget: entry.is_off_budget,
-              payments: entry.payments, provisionDetails: entry.provisionDetails
-            })),
-            newAllActuals: newActualsToInsert.map(a => ({
-                ...a,
-                payments: []
-            })),
-            newTiers: createdTiers.map(t => ({ id: t.id, name: t.name, type: t.type })),
-            newLoans: newLoans.map(l => ({
-                id: l.id, projectId: l.project_id, type: l.type, thirdParty: l.third_party, principal: l.principal, term: l.term,
-                monthlyPayment: l.monthly_payment, principalDate: l.principal_date, repaymentStartDate: l.repayment_start_date
-            })),
+            newAllEntries: [],
+            newAllActuals: [],
+            newTiers: [],
+            newLoans: [],
         }
     });
     
@@ -361,6 +250,100 @@ export const updateUserCashAccount = async (dispatch, { projectId, accountId, ac
     }
 };
 
+export const addUserCashAccount = async (dispatch, { projectId, mainCategoryId, name, initialBalance, initialBalanceDate, user }) => {
+    try {
+        const { data: newAccount, error } = await supabase
+            .from('cash_accounts')
+            .insert({
+                project_id: projectId,
+                user_id: user.id,
+                main_category_id: mainCategoryId,
+                name,
+                initial_balance: initialBalance,
+                initial_balance_date: initialBalanceDate,
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        dispatch({
+            type: 'ADD_USER_CASH_ACCOUNT_SUCCESS',
+            payload: {
+                projectId,
+                newAccount: {
+                    id: newAccount.id,
+                    projectId: newAccount.project_id,
+                    mainCategoryId: newAccount.main_category_id,
+                    name: newAccount.name,
+                    initialBalance: newAccount.initial_balance,
+                    initialBalanceDate: newAccount.initial_balance_date,
+                    isClosed: newAccount.is_closed,
+                    closureDate: newAccount.closure_date,
+                }
+            }
+        });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Compte ajouté avec succès.', type: 'success' } });
+    } catch (error) {
+        console.error("Error adding cash account:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};
+
+export const deleteUserCashAccount = async (dispatch, { projectId, accountId }) => {
+    try {
+        const { error } = await supabase
+            .from('cash_accounts')
+            .delete()
+            .eq('id', accountId);
+
+        if (error) throw error;
+
+        dispatch({
+            type: 'DELETE_USER_CASH_ACCOUNT_SUCCESS',
+            payload: { projectId, accountId }
+        });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Compte supprimé.', type: 'success' } });
+    } catch (error) {
+        console.error("Error deleting cash account:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};
+
+export const closeCashAccount = async (dispatch, { projectId, accountId, closureDate }) => {
+    try {
+        const { error } = await supabase
+            .from('cash_accounts')
+            .update({ is_closed: true, closure_date: closureDate })
+            .eq('id', accountId);
+
+        if (error) throw error;
+
+        dispatch({ type: 'CLOSE_CASH_ACCOUNT_SUCCESS', payload: { projectId, accountId, closureDate } });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Compte clôturé.', type: 'success' } });
+    } catch (error) {
+        console.error("Error closing cash account:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};
+
+export const reopenCashAccount = async (dispatch, { projectId, accountId }) => {
+    try {
+        const { error } = await supabase
+            .from('cash_accounts')
+            .update({ is_closed: false, closure_date: null })
+            .eq('id', accountId);
+
+        if (error) throw error;
+
+        dispatch({ type: 'REOPEN_CASH_ACCOUNT_SUCCESS', payload: { projectId, accountId } });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Compte ré-ouvert.', type: 'success' } });
+    } catch (error) {
+        console.error("Error reopening cash account:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};
+
 export const saveActual = async (dispatch, { actualData, editingActual, user, tiers }) => {
   try {
     const { thirdParty, type } = actualData;
@@ -497,6 +480,64 @@ export const writeOffActual = async (dispatch, actualId) => {
 
     } catch (error) {
         console.error("Error writing off actual:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};
+
+export const saveConsolidatedView = async (dispatch, { viewData, editingView, user }) => {
+    try {
+        const dataToSave = {
+            name: viewData.name,
+            description: viewData.description,
+            project_ids: viewData.projectIds,
+            user_id: user.id,
+        };
+
+        let savedView;
+        if (editingView) {
+            const { data, error } = await supabase
+                .from('consolidated_views')
+                .update(dataToSave)
+                .eq('id', editingView.id)
+                .select()
+                .single();
+            if (error) throw error;
+            savedView = data;
+            dispatch({ type: 'UPDATE_CONSOLIDATED_VIEW_SUCCESS', payload: savedView });
+            dispatch({ type: 'ADD_TOAST', payload: { message: 'Vue consolidée mise à jour.', type: 'success' } });
+        } else {
+            const { data, error } = await supabase
+                .from('consolidated_views')
+                .insert(dataToSave)
+                .select()
+                .single();
+            if (error) throw error;
+            savedView = data;
+            dispatch({ type: 'ADD_CONSOLIDATED_VIEW_SUCCESS', payload: savedView });
+            dispatch({ type: 'ADD_TOAST', payload: { message: 'Vue consolidée créée.', type: 'success' } });
+        }
+        dispatch({ type: 'CLOSE_CONSOLIDATED_VIEW_MODAL' });
+
+    } catch (error) {
+        console.error("Error saving consolidated view:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
+    }
+};
+
+export const deleteConsolidatedView = async (dispatch, viewId) => {
+    try {
+        const { error } = await supabase
+            .from('consolidated_views')
+            .delete()
+            .eq('id', viewId);
+        
+        if (error) throw error;
+
+        dispatch({ type: 'DELETE_CONSOLIDATED_VIEW_SUCCESS', payload: viewId });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Vue consolidée supprimée.', type: 'success' } });
+
+    } catch (error) {
+        console.error("Error deleting consolidated view:", error);
         dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur: ${error.message}`, type: 'error' } });
     }
 };

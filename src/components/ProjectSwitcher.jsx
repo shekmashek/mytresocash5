@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronsUpDown, Check, Plus, Edit, Trash2, Archive } from 'lucide-react';
+import { ChevronsUpDown, Check, Plus, Edit, Trash2, Archive, Layers } from 'lucide-react';
 import ProjectModal from './ProjectModal';
 import { useBudget } from '../context/BudgetContext';
 import { useTranslation } from '../utils/i18n';
@@ -7,18 +7,19 @@ import { supabase } from '../utils/supabase';
 
 const ProjectSwitcher = () => {
   const { state, dispatch } = useBudget();
-  const { projects, activeProjectId } = state;
+  const { projects, activeProjectId, consolidatedViews } = state;
   const { t } = useTranslation();
+  
   const activeProjects = projects.filter(p => !p.isArchived);
-  const activeProject = projects.find(p => p.id === activeProjectId) || { id: 'consolidated', name: t('subHeader.consolidatedBudget') };
+  const activeItem = 
+    consolidatedViews.find(v => v.id === activeProjectId) ||
+    projects.find(p => p.id === activeProjectId);
 
   const [isListOpen, setIsListOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
   
   const listRef = useRef(null);
-
-  const isConsolidated = activeProject.id === 'consolidated';
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -28,8 +29,8 @@ const ProjectSwitcher = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSelectProject = (projectId) => {
-    dispatch({ type: 'SET_ACTIVE_PROJECT', payload: projectId });
+  const handleSelectItem = (itemId) => {
+    dispatch({ type: 'SET_ACTIVE_PROJECT', payload: itemId });
     setIsListOpen(false);
   };
 
@@ -41,6 +42,11 @@ const ProjectSwitcher = () => {
   const handleOpenRenameModal = (project) => {
     setEditingProject(project);
     setIsModalOpen(true);
+    setIsListOpen(false);
+  };
+
+  const handleOpenConsolidatedViewModal = (view = null) => {
+    dispatch({ type: 'OPEN_CONSOLIDATED_VIEW_MODAL', payload: view });
     setIsListOpen(false);
   };
 
@@ -76,7 +82,7 @@ const ProjectSwitcher = () => {
       type: 'OPEN_CONFIRMATION_MODAL',
       payload: {
         title: `Supprimer le projet "${projectToDelete.name}" ?`,
-        message: "Cette action est irréversible. Toutes les données associées à ce projet (budgets, transactions, scénarios) seront définitivement perdues. Pour conserver les données, vous pouvez plutôt l'archiver.",
+        message: "Cette action est irréversible. Toutes les données associées à ce projet seront définitivement perdues.",
         onConfirm: () => dispatch({ type: 'DELETE_PROJECT', payload: projectId }),
       }
     });
@@ -90,7 +96,7 @@ const ProjectSwitcher = () => {
       type: 'OPEN_CONFIRMATION_MODAL',
       payload: {
         title: `Archiver le projet "${projectToArchive.name}" ?`,
-        message: "L'archivage d'un projet le masquera de la liste principale, mais toutes ses données seront conservées. Vous pourrez le restaurer à tout moment depuis les paramètres avancés.",
+        message: "L'archivage d'un projet le masquera de la liste principale, mais toutes ses données seront conservées.",
         onConfirm: () => dispatch({ type: 'ARCHIVE_PROJECT', payload: projectId }),
         confirmText: 'Archiver',
         cancelText: 'Annuler',
@@ -98,8 +104,21 @@ const ProjectSwitcher = () => {
       }
     });
   };
+
+  const handleDeleteConsolidatedView = (viewId) => {
+    const viewToDelete = consolidatedViews.find(v => v.id === viewId);
+    if (!viewToDelete) return;
+    dispatch({
+      type: 'OPEN_CONFIRMATION_MODAL',
+      payload: {
+        title: `Supprimer la vue "${viewToDelete.name}" ?`,
+        message: "Cette action est irréversible. La vue consolidée sera supprimée, mais vos projets resteront intacts.",
+        onConfirm: () => dispatch({ type: 'DELETE_CONSOLIDATED_VIEW', payload: viewId }),
+      }
+    });
+  };
   
-  const displayName = activeProject.id === 'consolidated' ? `Mes projets consolidé` : activeProject.name;
+  const displayName = activeItem ? activeItem.name : 'Sélectionner un projet';
 
   return (
     <div className="relative w-full" ref={listRef}>
@@ -109,16 +128,31 @@ const ProjectSwitcher = () => {
       </button>
       {isListOpen && (
         <div className="absolute z-30 w-full mt-1 bg-white border rounded-lg shadow-lg">
-          <ul className="py-1 max-h-60 overflow-y-auto">
-            <li><button onClick={() => handleSelectProject('consolidated')} className="flex items-center justify-between w-full px-4 py-2 text-left text-gray-700 hover:bg-purple-50"><span className="font-semibold">Mes projets consolidé</span>{isConsolidated && <Check className="w-4 h-4 text-purple-600" />}</button></li>
+          <ul className="py-1 max-h-80 overflow-y-auto">
+            <li className="px-4 pt-2 pb-1 text-xs font-semibold text-gray-400 uppercase">Vues Consolidées</li>
+            {consolidatedViews.map(view => (
+              <li key={view.id} className="flex items-center justify-between w-full px-4 py-2 text-left text-gray-700 hover:bg-blue-50 group">
+                <button onClick={() => handleSelectItem(view.id)} className="flex items-center gap-2 flex-grow truncate">
+                  <span className="truncate">{view.name}</span>
+                </button>
+                <div className="flex items-center gap-1 pl-2">
+                  {view.id === activeProjectId && <Check className="w-4 h-4 text-blue-600" />}
+                  <button onClick={(e) => { e.stopPropagation(); handleOpenConsolidatedViewModal(view); }} className="p-1 text-gray-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Modifier"><Edit className="w-4 h-4" /></button>
+                  <button onClick={(e) => { e.stopPropagation(); handleDeleteConsolidatedView(view.id); }} className="p-1 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Supprimer"><Trash2 className="w-4 h-4" /></button>
+                </div>
+              </li>
+            ))}
+            <li><button onClick={() => handleOpenConsolidatedViewModal(null)} className="flex items-center w-full px-4 py-2 text-left text-blue-600 hover:bg-blue-50"><Plus className="w-4 h-4 mr-2" />Créer une vue consolidée</button></li>
+            
             <li><hr className="my-1" /></li>
+            <li className="px-4 pt-2 pb-1 text-xs font-semibold text-gray-400 uppercase">Projets Individuels</li>
             {activeProjects.map(project => (
               <li key={project.id} className="flex items-center justify-between w-full px-4 py-2 text-left text-gray-700 hover:bg-blue-50 group">
-                  <button onClick={() => handleSelectProject(project.id)} className="flex items-center gap-2 flex-grow truncate">
+                  <button onClick={() => handleSelectItem(project.id)} className="flex items-center gap-2 flex-grow truncate">
                       <span className="truncate">{project.name}</span>
                   </button>
                   <div className="flex items-center gap-1 pl-2">
-                      {project.id === activeProject.id && <Check className="w-4 h-4 text-blue-600" />}
+                      {project.id === activeProjectId && <Check className="w-4 h-4 text-blue-600" />}
                       <button onClick={(e) => { e.stopPropagation(); handleOpenRenameModal(project); }} className="p-1 text-gray-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Renommer"><Edit className="w-4 h-4" /></button>
                       <button onClick={(e) => { e.stopPropagation(); handleArchiveProject(project.id); }} className="p-1 text-gray-400 hover:text-yellow-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Archiver"><Archive className="w-4 h-4" /></button>
                       <button onClick={(e) => { e.stopPropagation(); handleDeleteProject(project.id); }} className="p-1 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Supprimer"><Trash2 className="w-4 h-4" /></button>

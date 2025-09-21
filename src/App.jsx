@@ -1,16 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useBudget } from './context/BudgetContext';
-import OnboardingView from './components/OnboardingView';
-import AuthView from './components/AuthView';
-import PublicLayout from './layouts/PublicLayout';
-import AppLayout from './layouts/AppLayout';
 import { supabase } from './utils/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, XCircle, AlertCircle, Info, X, Loader } from 'lucide-react';
+
+// Layouts
+import PublicLayout from './layouts/PublicLayout';
+import AppLayout from './layouts/AppLayout';
+
+// Public Pages
 import HomePage from './pages/HomePage';
 import LegalPage from './pages/LegalPage';
 import AboutPage from './pages/AboutPage';
+
+// App Pages & Views
+import OnboardingView from './components/OnboardingView';
+import AuthView from './components/AuthView';
 import DashboardView from './components/DashboardView';
 import BudgetTracker from './components/BudgetTracker';
 import CashflowView from './components/CashflowView';
@@ -22,9 +28,12 @@ import UnderConstructionView from './components/UnderConstructionView';
 import ProfilePage from './pages/ProfilePage';
 import SecurityPage from './pages/SecurityPage';
 import SubscriptionPage from './pages/SubscriptionPage';
-import DeleteAccountPage from './pages/DeleteAccountPage';
+import ReferralPage from './pages/ReferralPage';
 import DisplaySettingsPage from './pages/DisplaySettingsPage';
+import DeleteAccountPage from './pages/DeleteAccountPage';
+import CollaborationPage from './pages/CollaborationPage';
 
+// --- Toast Components ---
 const toastIcons = {
   success: <CheckCircle className="w-5 h-5" />,
   error: <XCircle className="w-5 h-5" />,
@@ -70,12 +79,13 @@ const ToastContainer = () => {
   );
 };
 
+// --- Protected Route Wrapper ---
 const ProtectedRoute = ({ children }) => {
   const { state } = useBudget();
   const { session, isOnboarding, projects } = state;
 
   if (!session) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
   if (isOnboarding || projects.length === 0) {
@@ -88,12 +98,13 @@ const ProtectedRoute = ({ children }) => {
 function App() {
   const { state, dispatch } = useBudget();
   const { session, isLoading } = state;
-  const [authMode, setAuthMode] = useState({ mode: null, fromTrial: false });
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       dispatch({ type: 'SET_SESSION', payload: session });
-      if (!session) setAuthMode({ mode: null, fromTrial: false });
+      if (!session) {
+        dispatch({ type: 'RESET_STATE' });
+      }
     });
     return () => authListener.subscription.unsubscribe();
   }, [dispatch]);
@@ -108,63 +119,55 @@ function App() {
     );
   }
 
-  const PublicArea = () => {
-    if (authMode.mode) {
-      return <AuthView 
-        initialMode={authMode.mode}
-        fromTrial={authMode.fromTrial}
-        onBack={() => setAuthMode({ mode: null, fromTrial: false })}
-      />;
-    }
-    return <PublicLayout 
-      onLogin={() => setAuthMode({ mode: 'login', fromTrial: false })} 
-      onSignUp={() => setAuthMode({ mode: 'signup', fromTrial: true })}
-    />;
-  };
-  
-  const HomePageWithAuthTrigger = () => {
-      return <HomePage onSignUp={() => setAuthMode({ mode: 'signup', fromTrial: true })} />;
-  };
-
   return (
     <>
       <ToastContainer />
       <Routes>
-        {session ? (
-          <>
-            <Route path="/app" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-              <Route index element={<Navigate to="dashboard" replace />} />
-              <Route path="dashboard" element={<DashboardView />} />
-              <Route path="trezo" element={<BudgetTracker />} />
-              <Route path="flux" element={<CashflowView />} />
-              <Route path="echeancier" element={<ScheduleView />} />
-              <Route path="scenarios" element={<ScenarioView />} />
-              <Route path="analyse" element={<ExpenseAnalysisView />} />
-              <Route path="journal-budget" element={<JournalsView type="budget" />} />
-              <Route path="journal-paiements" element={<JournalsView type="payment" />} />
-              <Route path="profil" element={<ProfilePage />} />
-              <Route path="securite" element={<SecurityPage />} />
-              <Route path="abonnement" element={<SubscriptionPage />} />
-              <Route path="display-settings" element={<DisplaySettingsPage />} />
-              <Route path="delete-account" element={<DeleteAccountPage />} />
-              <Route path="factures" element={<UnderConstructionView title="Factures" />} />
-              <Route path="aide" element={<UnderConstructionView title="Centre d'aide" />} />
-              <Route path="*" element={<Navigate to="dashboard" replace />} />
-            </Route>
-            <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
-          </>
-        ) : (
-          <Route element={<PublicArea />}>
-            <Route path="/" element={<HomePageWithAuthTrigger />} />
-            <Route path="/a-propos" element={<AboutPage />} />
-            <Route path="/cgu" element={<LegalPage type="cgu" />} />
-            <Route path="/rgpd" element={<LegalPage type="rgpd" />} />
-            <Route path="/cookies" element={<LegalPage type="cookies" />} />
-            <Route path="/mentions-legales" element={<LegalPage type="mentions" />} />
-            <Route path="/politique-de-confidentialite" element={<LegalPage type="privacy" />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-        )}
+        {/* Public Routes */}
+        <Route path="/" element={<PublicLayout />}>
+          <Route index element={<HomePage />} />
+          <Route path="a-propos" element={<AboutPage />} />
+          <Route path="cgu" element={<LegalPage type="cgu" />} />
+          <Route path="rgpd" element={<LegalPage type="rgpd" />} />
+          <Route path="cookies" element={<LegalPage type="cookies" />} />
+          <Route path="mentions-legales" element={<LegalPage type="mentions" />} />
+          <Route path="politique-de-confidentialite" element={<LegalPage type="privacy" />} />
+        </Route>
+
+        {/* Auth Route */}
+        <Route path="/auth" element={<AuthView />} />
+
+        {/* Protected App Routes */}
+        <Route 
+          path="/app" 
+          element={
+            <ProtectedRoute>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="/app/dashboard" replace />} />
+          <Route path="dashboard" element={<DashboardView />} />
+          <Route path="trezo" element={<BudgetTracker />} />
+          <Route path="flux" element={<CashflowView />} />
+          <Route path="echeancier" element={<ScheduleView />} />
+          <Route path="scenarios" element={<ScenarioView />} />
+          <Route path="analyse" element={<ExpenseAnalysisView />} />
+          <Route path="journal-budget" element={<JournalsView type="budget" />} />
+          <Route path="journal-paiements" element={<JournalsView type="payment" />} />
+          <Route path="profil" element={<ProfilePage />} />
+          <Route path="securite" element={<SecurityPage />} />
+          <Route path="abonnement" element={<SubscriptionPage />} />
+          <Route path="parrainage" element={<ReferralPage />} />
+          <Route path="display-settings" element={<DisplaySettingsPage />} />
+          <Route path="delete-account" element={<DeleteAccountPage />} />
+          <Route path="collaborateurs" element={<CollaborationPage />} />
+          <Route path="factures" element={<UnderConstructionView title="Factures" />} />
+          <Route path="aide" element={<UnderConstructionView title="Centre d'aide" />} />
+        </Route>
+
+        {/* Redirect any other path */}
+        <Route path="*" element={<Navigate to={session ? "/app/dashboard" : "/"} replace />} />
       </Routes>
     </>
   );

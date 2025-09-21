@@ -2,9 +2,17 @@ import React, { useState } from 'react';
 import { supabase } from '../utils/supabase';
 import TrezocashLogo from './TrezocashLogo';
 import { LogIn, UserPlus, Loader, ArrowLeft } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 
-const AuthView = ({ initialMode = 'login', fromTrial = false, onBack }) => {
-  const [isLogin, setIsLogin] = useState(initialMode === 'login');
+const AuthView = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const initialState = location.state || { mode: 'login', fromTrial: false };
+  
+  const [isLogin, setIsLogin] = useState(initialState.mode === 'login');
+  const fromTrial = initialState.fromTrial;
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -21,6 +29,7 @@ const AuthView = ({ initialMode = 'login', fromTrial = false, onBack }) => {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        navigate('/app');
       } else {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
@@ -31,6 +40,10 @@ const AuthView = ({ initialMode = 'login', fromTrial = false, onBack }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBack = () => {
+    navigate(-1);
   };
   
   const signUpTitle = fromTrial ? "Démarrer votre essai de 14 jours" : "Créer un compte";
@@ -48,7 +61,7 @@ const AuthView = ({ initialMode = 'login', fromTrial = false, onBack }) => {
         </div>
         
         <div className="bg-white p-8 rounded-xl shadow-lg border relative">
-          <button onClick={onBack} className="absolute top-4 left-4 text-gray-500 hover:text-gray-800 transition-colors">
+          <button onClick={handleBack} className="absolute top-4 left-4 text-gray-500 hover:text-gray-800 transition-colors">
             <ArrowLeft size={20} />
           </button>
           <div className="flex border-b mb-6">

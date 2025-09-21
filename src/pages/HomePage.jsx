@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { AreaChart, Calendar, Layers, PieChart, Table, Briefcase, User, CheckCircle, Zap, Plus, BarChart, Lock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const FeatureCard = ({ icon: Icon, title, description, color }) => {
     const colorClasses = {
@@ -60,7 +61,13 @@ const AccordionItem = ({ title, children }) => {
   );
 };
 
-const HomePage = ({ onSignUp }) => {
+const HomePage = () => {
+    const navigate = useNavigate();
+
+    const handleSignUp = () => {
+        navigate('/auth', { state: { mode: 'signup', fromTrial: true } });
+    };
+
     const features = [
         { icon: Table, title: "Trezo", description: "Votre tableau de trésorerie complet pour une vision détaillée de vos flux.", color: "blue" },
         { icon: AreaChart, title: "Flux", description: "Visualisez vos entrées, sorties et l'évolution de votre solde en un clin d'œil.", color: "green" },
@@ -119,7 +126,7 @@ const HomePage = ({ onSignUp }) => {
                     Pilotez, anticipez et maîtrisez votre trésorerie. Trezocash centralise tous vos projets pour une vision claire et des décisions éclairées.
                 </motion.p>
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.4 }} className="mt-10 flex justify-center gap-4">
-                    <button onClick={onSignUp} className="px-8 py-3 font-semibold text-white bg-blue-600 rounded-lg shadow-lg hover:bg-blue-700 transition-transform hover:scale-105">
+                    <button onClick={handleSignUp} className="px-8 py-3 font-semibold text-white bg-blue-600 rounded-lg shadow-lg hover:bg-blue-700 transition-transform hover:scale-105">
                         Démarrer mon essai gratuit (14 jours)
                     </button>
                 </motion.div>
@@ -248,7 +255,7 @@ const HomePage = ({ onSignUp }) => {
                             </div>
                         </div>
                         <div>
-                            <button onClick={onSignUp} className="w-full px-6 py-3 font-semibold text-blue-600 bg-blue-100 rounded-lg hover:bg-blue-200 transition-colors">Démarrer l'essai de 14 jours</button>
+                            <button onClick={handleSignUp} className="w-full px-6 py-3 font-semibold text-blue-600 bg-blue-100 rounded-lg hover:bg-blue-200 transition-colors">Démarrer l'essai de 14 jours</button>
                             <div className="h-10 mt-4"></div> {/* Urgency Placeholder */}
                             <hr className="my-8" />
                             <ul className="space-y-3 text-sm">{featuresList.map((feature, index) => (<li key={index} className="flex items-center gap-3"><CheckCircle className="w-5 h-5 text-green-500" /><span className="text-gray-700">{feature}</span></li>))}</ul>
@@ -270,7 +277,7 @@ const HomePage = ({ onSignUp }) => {
                             </div>
                         </div>
                         <div>
-                            <button onClick={onSignUp} className="w-full px-6 py-3 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-lg">Démarrer l'essai de 14 jours</button>
+                            <button onClick={handleSignUp} className="w-full px-6 py-3 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-lg">Démarrer l'essai de 14 jours</button>
                             <div className="h-10 mt-4"></div> {/* Urgency Placeholder */}
                             <hr className="my-8" />
                             <ul className="space-y-3 text-sm">{featuresList.map((feature, index) => (<li key={index} className="flex items-center gap-3"><CheckCircle className="w-5 h-5 text-green-500" /><span className="text-gray-700">{feature}</span></li>))}</ul>
@@ -290,7 +297,7 @@ const HomePage = ({ onSignUp }) => {
                             </div>
                         </div>
                         <div>
-                            <button onClick={onSignUp} className="w-full px-6 py-3 font-semibold text-gray-900 bg-gradient-to-r from-amber-300 to-yellow-400 rounded-lg hover:opacity-90 transition-opacity shadow-lg">Devenir un Visionnaire</button>
+                            <button onClick={handleSignUp} className="w-full px-6 py-3 font-semibold text-gray-900 bg-gradient-to-r from-amber-300 to-yellow-400 rounded-lg hover:opacity-90 transition-opacity shadow-lg">Devenir un Visionnaire</button>
                             <p className="text-center text-xs text-yellow-400 font-bold mt-4 h-10 flex items-center justify-center">⚠️ Offre limitée aux 100 premiers visionnaires.</p>
                             <hr className="my-8 border-gray-600" />
                             <ul className="space-y-3 text-sm">{featuresList.map((feature, index) => (<li key={index} className="flex items-center gap-3"><CheckCircle className="w-5 h-5 text-green-400" /><span className="text-gray-300">{feature}</span></li>))}</ul>

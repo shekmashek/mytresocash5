@@ -3,6 +3,7 @@ import { useBudget } from '../context/BudgetContext';
 import { formatCurrency } from '../utils/formatting';
 import { ChevronLeft, ChevronRight, AlertTriangle, Calendar, ArrowUp, ArrowDown } from 'lucide-react';
 import { getTodayInTimezone } from '../utils/budgetCalculations';
+import { useTreasuryData } from '../hooks/useTreasuryData';
 
 const DayCell = ({ day, transactions, isToday, isCurrentMonth, currencySettings, todayDate, viewMode, onTransactionClick }) => {
     const dayNumber = day.getDate();
@@ -82,28 +83,23 @@ const DayCell = ({ day, transactions, isToday, isCurrentMonth, currencySettings,
 
 const ScheduleView = ({ isFocusMode = false, currentDate: propCurrentDate, viewMode: propViewMode }) => {
     const { state, dispatch } = useBudget();
-    const { allActuals, settings, projects, activeProjectId } = state;
+    const { settings, projects } = state;
+    
+    const { actualTransactions, isConsolidated } = useTreasuryData();
 
     const [localCurrentDate, setLocalCurrentDate] = useState(new Date());
     const [localViewMode, setLocalViewMode] = useState('month');
 
     const currentDate = isFocusMode ? propCurrentDate : localCurrentDate;
     const viewMode = isFocusMode ? propViewMode : localViewMode;
-    const isConsolidated = activeProjectId === 'consolidated';
 
     const today = getTodayInTimezone(settings.timezoneOffset);
-
-    const allRelevantActuals = useMemo(() => {
-        return Object.entries(allActuals).flatMap(([projectId, actuals]) => 
-            actuals.map(actual => ({ ...actual, projectId }))
-        );
-    }, [allActuals]);
 
     const { transactionsByDate, overdueTransactions } = useMemo(() => {
         const byDate = new Map();
         const overdue = [];
 
-        allRelevantActuals.forEach(actual => {
+        actualTransactions.forEach(actual => {
             const dueDate = new Date(actual.date);
             dueDate.setHours(0, 0, 0, 0);
 
@@ -123,7 +119,7 @@ const ScheduleView = ({ isFocusMode = false, currentDate: propCurrentDate, viewM
         overdue.sort((a, b) => new Date(a.date) - new Date(b.date));
 
         return { transactionsByDate: byDate, overdueTransactions: overdue };
-    }, [allRelevantActuals, today]);
+    }, [actualTransactions, today]);
 
     const calendarGrid = useMemo(() => {
         const grid = [];

@@ -176,6 +176,40 @@ export const saveEntry = async (dispatch, { entryData, editingEntry, activeProje
     }
 };
 
+export const deleteEntry = async (dispatch, { entryId, entryProjectId }) => {
+    if (!entryId || !entryProjectId) {
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Informations manquantes pour la suppression.', type: 'error' } });
+        return;
+    }
+    try {
+        const unsettledStatuses = ['pending', 'partially_paid', 'partially_received'];
+        const { error: deleteActualsError } = await supabase
+            .from('actual_transactions')
+            .delete()
+            .eq('budget_id', entryId)
+            .in('status', unsettledStatuses);
+        
+        if (deleteActualsError) throw deleteActualsError;
+
+        const { error: deleteEntryError } = await supabase
+            .from('budget_entries')
+            .delete()
+            .eq('id', entryId);
+
+        if (deleteEntryError) throw deleteEntryError;
+
+        dispatch({
+            type: 'DELETE_ENTRY_SUCCESS',
+            payload: { entryId, entryProjectId }
+        });
+        dispatch({ type: 'ADD_TOAST', payload: { message: 'Entrée budgétaire supprimée.', type: 'success' } });
+
+    } catch (error) {
+        console.error("Error deleting entry:", error);
+        dispatch({ type: 'ADD_TOAST', payload: { message: `Erreur lors de la suppression: ${error.message}`, type: 'error' } });
+    }
+};
+
 export const updateSettings = async (dispatch, user, newSettings) => {
     if (!user) {
         dispatch({ type: 'ADD_TOAST', payload: { message: 'Utilisateur non authentifié.', type: 'error' } });
@@ -433,6 +467,7 @@ export const recordPayment = async (dispatch, { actualId, paymentData, allActual
             payment_date: paymentData.paymentDate,
             paid_amount: paymentData.paidAmount,
             cash_account: paymentData.cashAccount,
+            user_id: supabase.auth.getUser().id, // Ensure user_id is set
         }).select().single();
         if (paymentError) throw paymentError;
 

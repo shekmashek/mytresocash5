@@ -2,11 +2,12 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Plus, Edit, Eye, Search, Table, LogIn, Flag, ChevronDown, Folder, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, XCircle, Trash2, ArrowRightLeft, AlertTriangle, ChevronUp } from 'lucide-react';
 import TransactionDetailDrawer from './TransactionDetailDrawer';
 import ResizableTh from './ResizableTh';
-import { getEntryAmountForPeriod, getActualAmountForPeriod, getTodayInTimezone } from '../utils/budgetCalculations';
+import { getEntryAmountForPeriod, getActualAmountForPeriod, getTodayInTimezone, getStartOfWeek } from '../utils/budgetCalculations';
 import { formatCurrency } from '../utils/formatting';
 import { useBudget } from '../context/BudgetContext';
 import { useTranslation } from '../utils/i18n';
 import { useTreasuryData } from '../hooks/useTreasuryData';
+import { deleteEntry } from '../context/actions';
 
 const BudgetTracker = () => {
   const { state, dispatch } = useBudget();
@@ -97,7 +98,16 @@ const BudgetTracker = () => {
 
   const handleNewBudget = () => { if (!isConsolidated) { dispatch({ type: 'OPEN_BUDGET_MODAL', payload: null }); } };
   const handleEditEntry = (entry) => { dispatch({ type: 'OPEN_BUDGET_MODAL', payload: entry }); };
-  const handleDeleteEntry = (entry) => { dispatch({ type: 'OPEN_CONFIRMATION_MODAL', payload: { title: `Supprimer "${entry.supplier}" ?`, message: "Cette action est irréversible et supprimera l'entrée budgétaire et ses prévisions.", onConfirm: () => dispatch({ type: 'DELETE_ENTRY', payload: { entryId: entry.id, entryProjectId: entry.projectId || activeProjectId } }), } }); };
+  const handleDeleteEntry = (entry) => { 
+    dispatch({ 
+        type: 'OPEN_CONFIRMATION_MODAL', 
+        payload: { 
+            title: `Supprimer "${entry.supplier}" ?`, 
+            message: "Cette action est irréversible et supprimera l'entrée budgétaire et ses prévisions.", 
+            onConfirm: () => deleteEntry(dispatch, { entryId: entry.id, entryProjectId: entry.projectId || activeProjectId }),
+        } 
+    }); 
+  };
   const formatDate = (dateString) => dateString ? new Date(dateString).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
   const getFrequencyTitle = (entry) => { const freq = entry.frequency.charAt(0).toUpperCase() + entry.frequency.slice(1); if (entry.frequency === 'ponctuel') return `Ponctuel: ${formatDate(entry.date)}`; if (entry.frequency === 'irregulier') return `Irrégulier: ${entry.payments?.length || 0} paiements`; const period = `De ${formatDate(entry.startDate)} à ${entry.endDate ? formatDate(entry.endDate) : '...'}`; return `${freq} | ${period}`; };
   const getResteColor = (reste, isEntree) => reste === 0 ? 'text-text-secondary' : isEntree ? (reste <= 0 ? 'text-success-600' : 'text-danger-600') : (reste >= 0 ? 'text-success-600' : 'text-danger-600');
